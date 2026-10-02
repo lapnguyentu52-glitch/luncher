@@ -1,0 +1,12 @@
+[package]
+name = "antares-net"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+antares-downloads = { path = "../antares-downloads" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+parking_lot.workspace = true

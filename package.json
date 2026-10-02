@@ -1,0 +1,23 @@
+{
+  "name": "antares",
+  "private": true,
+  "version": "4.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @antares/desktop dev",
+    "build": "pnpm --filter @antares/desktop build",
+    "typecheck": "pnpm --filter @antares/desktop typecheck",
+    "lint": "pnpm --filter @antares/desktop lint",
+    "test": "pnpm --filter @antares/desktop test",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:debug": "tauri build --debug",
+    "tauri:build:portable": "tauri build --no-bundle"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
+  }
+}

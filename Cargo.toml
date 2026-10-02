@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/antares-storage",
+    "crates/antares-core",
+    "crates/antares-bridge",
+    "crates/antares-downloads",
+    "crates/antares-process",
+    "crates/antares-java",
+    "crates/antares-launch",
+    "crates/antares-net",
+    "crates/antares-profiles",
+    "crates/antares-system",
+    "crates/antares-diagnostics",
+    "crates/antares-optimization",
+    "crates/antares-mods",
+    "crates/antares-resources",
+    "crates/antares-visuals",
+]
+
+[workspace.package]
+version = "4.0.0"
+edition = "2021"
+rust-version = "1.77"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+log = "0.4"
+parking_lot = "0.12"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -1,0 +1,146 @@
+/* ============================================================
+   Animations — chỉ animate opacity/transform (spec mục 26)
+   ============================================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.995); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes view-leave {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes float-pulse {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-4px) scale(1.03); opacity: .9; }
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-ring); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Chấm trạng thái "đang chạy" — toả nhẹ rồi tắt, lặp chậm, không gây phân tâm */
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); }
+  50% { box-shadow: 0 0 0 4px transparent; }
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Stagger: các item trong grid/list xuất hiện lần lượt (thêm class .stagger
+   vào container — thuần CSS, không cần JS tính delay). Giới hạn 14 item đầu để
+   danh sách dài không bị "chờ" quá lâu; item sau item 14 hiện ngay. ---- */
+.stagger > * {
+  animation: fade-slide-up var(--motion-slow) var(--ease-out) both;
+}
+.stagger > *:nth-child(n+15) { animation-delay: 0ms !important; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 35ms; }
+.stagger > *:nth-child(3) { animation-delay: 70ms; }
+.stagger > *:nth-child(4) { animation-delay: 105ms; }
+.stagger > *:nth-child(5) { animation-delay: 140ms; }
+.stagger > *:nth-child(6) { animation-delay: 175ms; }
+.stagger > *:nth-child(7) { animation-delay: 210ms; }
+.stagger > *:nth-child(8) { animation-delay: 245ms; }
+.stagger > *:nth-child(9) { animation-delay: 280ms; }
+.stagger > *:nth-child(10) { animation-delay: 315ms; }
+.stagger > *:nth-child(11) { animation-delay: 350ms; }
+.stagger > *:nth-child(12) { animation-delay: 385ms; }
+.stagger > *:nth-child(13) { animation-delay: 420ms; }
+.stagger > *:nth-child(14) { animation-delay: 455ms; }
+
+/* UIX v3: hàng trong virtual list mount mới -> fade-slide-up nhanh, không chậm tay */
+[data-anim="row"] {
+  animation: fade-slide-up var(--motion-fast) var(--ease-out) both;
+}
+
+/* UIX v3: card micro-interaction — lift khi hover, ép nhẹ khi nhấn */
+@media (hover: hover) {
+  .card.hoverable,
+  .inst-card,
+  .skin-card {
+    transition: transform var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast);
+    will-change: transform;
+  }
+  .card.hoverable:hover,
+  .inst-card:hover,
+  .skin-card:hover {
+    transform: translateY(-3px);
+  }
+  .inst-card:active,
+  .skin-card:active {
+    transform: translateY(-1px) scale(.985);
+  }
+}
+
+/* UIX v3: skeleton loading — sweep shimmer thuần CSS cho các khối chờ data */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+  min-height: 14px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--bg-hover), transparent);
+  animation: shimmer 1.4s var(--ease-in-out) infinite;
+}
+.skeleton.title { height: 22px; width: 42%; }
+.skeleton.line { height: 12px; width: 78%; }
+.skeleton.card { min-height: 96px; border-radius: var(--radius-md); }
+
+/* Người dùng chọn "Reduced motion" trong Settings (spec 154) */
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

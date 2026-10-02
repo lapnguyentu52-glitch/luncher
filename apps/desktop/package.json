@@ -1,0 +1,40 @@
+{
+  "name": "@antares/desktop",
+  "private": true,
+  "version": "4.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "pinia": "^3",
+    "three": "^0.186.1",
+    "vue": "^3.5",
+    "vue-router": "^4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-vue": "^6",
+    "@vue/eslint-config-typescript": "^14",
+    "@vue/test-utils": "^2",
+    "eslint": "^9",
+    "eslint-plugin-vue": "^10",
+    "jsdom": "^26",
+    "typescript": "~5.9",
+    "vite": "^7",
+    "vitest": "^3",
+    "vue-tsc": "^3"
+  }
+}

@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+coverage/
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Tauri / Rust
+src-tauri/target/
+crates/**/target/
+target/
+
+# Logs & temp
+*.log
+*.tmp
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Misc
+*.png.bak
+ChatGPT Image*

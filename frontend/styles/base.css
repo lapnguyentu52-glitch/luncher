@@ -1,0 +1,212 @@
+/* ============================================================
+   Base — reset, typography, scrollbars, focus, utilities
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  font-weight: var(--weight-normal);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+/* Lớp nền nhiều lớp: aurora + vignette (không gây reflow).
+   UX-1: blob trôi RẤT chậm bằng transform (compositor-only, không repaint —
+   docs/UIUX-UPGRADE.md §2.2); reduced-motion -> đứng im. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -12%;              /* dư biên cho transform trôi không lộ mép */
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(255, 92, 71, .15), transparent 62%),
+    radial-gradient(760px 480px at 100% 0%, rgba(94, 160, 255, .11), transparent 60%),
+    radial-gradient(700px 700px at 50% 120%, rgba(160, 107, 255, .09), transparent 62%);
+  animation: aurora-drift 90s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes aurora-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-2.5%, 2%, 0) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce), [data-motion="reduced"] {
+  body::before { animation: none; }
+}
+
+/* Lớp hạt nhiễu (grain) rất mờ — thêm chiều sâu "chất liệu" cho nền,
+   1 lớp tĩnh duy nhất nên không tốn hiệu năng (spec: chỉ animate opacity/transform,
+   lớp này không animate). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .028;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+[data-theme="light"] body::after { opacity: .018; }
+
+/* Aurora nhạt hơn 50% ở light theme (UX-1) */
+[data-theme="light"] body::before { opacity: .55; }
+
+/* Người dùng tắt transparency (OS) -> glass đặc, không blur (UX-1 fallback) */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: var(--bg-1);
+    --glass-strong: var(--bg-2);
+    --blur-glass: 0px;
+    --blur-strong: 0px;
+    --blur-scrim: 0px;
+  }
+  body::before, body::after { display: none; }
+}
+
+h1, h2, h3, h4 {
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+
+a {
+  color: var(--accent-0);
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+code, kbd, pre {
+  font-family: var(--font-mono);
+  font-size: .92em;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border-1);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-3);
+  color: var(--text-1);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* ---- Selection ---- */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-0);
+}
+
+/* ---- Scrollbars ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-4) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-4);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-2);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---- Focus (keyboard only, spec 326 accessibility) ---- */
+:focus { outline: none; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Trạng thái mặc định cho ảnh/icon ---- */
+img, svg { display: block; }
+svg { flex: 0 0 auto; }
+
+/* ---- Utilities ---- */
+.grow { flex: 1 1 auto; min-width: 0; }
+.muted { color: var(--text-2); font-size: var(--fs-sm); }
+.dim { color: var(--text-3); }
+.center { text-align: center; }
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.inline { display: flex; align-items: center; gap: var(--space-2); }
+.wrap { flex-wrap: wrap; }
+.hidden { display: none !important; }
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skeleton loading (thay spinner chặn — spec 68) */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  color: transparent !important;
+  min-height: 14px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--bg-hover), transparent);
+  animation: shimmer 1.4s infinite;
+}

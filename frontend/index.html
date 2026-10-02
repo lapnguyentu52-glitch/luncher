@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark" data-accent="red" data-motion="full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#06070b" />
+  <title>Antares Launcher</title>
+
+  <!-- Design system theo lớp (spec mục 3 / 241) -->
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/layout.css" />
+  <link rel="stylesheet" href="styles/components.css" />
+  <link rel="stylesheet" href="styles/views.css" />
+  <link rel="stylesheet" href="styles/animations.css" />
+</head>
+<body>
+  <!-- Splash: hiển thị tới khi shell + i18n sẵn sàng, sau đó mờ đi -->
+  <div id="splash">
+    <div class="splash-inner">
+      <div class="splash-mark">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="m12 2.6 2.86 5.8 6.4.93-4.63 4.51 1.09 6.37L12 17.2l-5.72 3.01 1.09-6.37L2.74 9.33l6.4-.93Z" />
+        </svg>
+      </div>
+      <div class="splash-name">Antares</div>
+      <div class="splash-tag">Launcher</div>
+    </div>
+  </div>
+
+  <script>
+    // Boot watchdog — module graph fail (server chết / import lỗi) thì splash
+    // KHÔNG được nhấp nháy mãi: sau 7s hiện lỗi rõ ràng + nút thử lại.
+    window.__bootErrors = [];
+    window.addEventListener('error', function (e) {
+      window.__bootErrors.push(String((e && e.message) || e).slice(0, 160));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      window.__bootErrors.push(String(e.reason).slice(0, 160));
+    });
+    setTimeout(function () {
+      var s = document.getElementById('splash');
+      if (!s || s.hidden) return;                    // boot OK — không làm gì
+      var tag = s.querySelector('.splash-tag');
+      if (tag) {
+        var errs = (window.__bootErrors || []).slice(0, 3).join(' | ');
+        tag.innerHTML = 'Không khởi động được UI' +
+          (errs ? '<br><small style="opacity:.7">' + errs + '</small>' : '') +
+          '<br><small style="opacity:.7">Kiểm tra bridge/server rồi bấm thử lại</small>' +
+          '<br><button onclick="location.reload()" style="margin-top:10px;padding:6px 18px;' +
+          'border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;' +
+          'color:inherit;cursor:pointer">Thử lại</button>';
+      }
+      s.classList.add('boot-stuck');                 // ngừng animation nhấp nháy
+    }, 7000);
+  </script>
+
+  <div id="app">
+    <aside id="sidebar" aria-label="Primary">
+      <div class="sidebar-head" id="sidebar-head"></div>
+      <nav class="sidebar-nav" id="sidebar-nav" aria-label="Sections"></nav>
+      <div class="sidebar-foot" id="sidebar-foot"></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main id="content" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div id="statusbar"></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <div class="empty" style="position:fixed;inset:0;background:#06070b;z-index:9999">
+      <div class="big">⚠</div>
+      This launcher needs JavaScript enabled.
+    </div>
+  </noscript>
+
+  <script type="module" src="app/bootstrap.js"></script>
+</body>
+</html>

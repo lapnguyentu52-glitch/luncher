@@ -1,0 +1,1 @@
+"""Antares Launcher application package."""

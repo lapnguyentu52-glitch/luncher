@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege — workflow này chỉ đọc repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Rust core (không build Tauri shell ở đây — shell được verify ở job
+  # tauri-shell bên dưới và build đầy đủ ở windows-build.yml)
+  rust:
+    name: Rust (workspace)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test (workspace, trừ Tauri shell)
+        run: cargo test --workspace --exclude antares-desktop
+
+  # Verify src-tauri compile — bắt lỗi shell sớm thay vì chờ tới tag build.
+  # frontendDist phải tồn tại trước vì tauri::generate_context!() embed assets.
+  tauri-shell:
+    name: Tauri shell check (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend (frontendDist cho generate_context!)
+        run: pnpm --filter @antares/desktop build
+      - name: Check Tauri shell
+        run: cargo check -p antares-desktop
+
+  # Frontend Vue 3 + TS
+  frontend:
+    name: Frontend (Vue 3 + TS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  # Python legacy sidecar (baseline tests — 254 phải luôn xanh)
+  python:
+    name: Python legacy (baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests -q

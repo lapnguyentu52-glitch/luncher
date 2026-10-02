@@ -1,0 +1,62 @@
+# Antares Launcher — Windows build (Tauri 2, toolchain MSVC)
+# Chạy: tab Actions → "Windows build" → Run workflow (hoặc push tag v*).
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+# Least privilege — workflow chỉ build + upload artifact.
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # beforeBuildCommand trong tauri.conf.json tự build frontend (vue-tsc + vite)
+      - name: Build (exe + NSIS installer)
+        run: pnpm tauri build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: antares-windows-installer
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Upload portable exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: antares-windows-portable
+          path: target/release/antares-desktop.exe
+          if-no-files-found: warn

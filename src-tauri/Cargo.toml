@@ -1,0 +1,23 @@
+[package]
+name = "antares-desktop"
+version.workspace = true
+description = "Antares Launcher — Minecraft Control Center (Tauri 2 shell)"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "antares_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+antares-core = { path = "../crates/antares-core" }
+antares-bridge = { path = "../crates/antares-bridge" }
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+parking_lot.workspace = true

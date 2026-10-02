@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "antares-companion",
+  "version": "${version}",
+  "name": "Antares Companion",
+  "description": "Sends FPS/frametime telemetry to Antares Launcher over local IPC.",
+  "authors": ["Antares"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.antares.companion.AntaresCompanionClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21"
+  }
+}

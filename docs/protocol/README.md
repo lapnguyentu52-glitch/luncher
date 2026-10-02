@@ -1,0 +1,89 @@
+# Antares Typed Protocol — Batch 3
+
+Contract giữa Vue UI và Rust core. Hai phía phải đồng bộ:
+
+```text
+TS:   apps/desktop/src/types/protocol.ts  +  types/commands.ts
+Rust: src-tauri/src/protocol/{error,response,event}.rs  +  commands/app.rs
+```
+
+## Response envelope (§96)
+
+Mọi command trả `AntaresResponse<T>` — không throw raw stack trace vào UI:
+
+```json
+{ "ok": true,  "data": { ... }, "warnings": [] }
+{ "ok": false, "error": { "code": "INSTANCE_LOCKED", "message": "...", "retryable": true, "action": "OPEN_INSTANCE" }, "warnings": [] }
+```
+
+TS side có 2 cách gọi (`services/ipc.ts`):
+
+```ts
+const payload = await invokeCommand('app_ping')        // throw IpcError nếu !ok
+const envelope = await requestCommand('app_ping')      // không throw, trả envelope
+```
+
+Ngoài Tauri (browser dev/test), đăng ký mock qua `registerBrowserFallback(command, fn)`.
+
+## Error taxonomy (§117)
+
+Catalog tập trung — không hardcode string lẻ trong UI:
+
+```text
+TS:   ErrorCodes / ErrorDomain trong types/protocol.ts
+Rust: codes::* trong protocol/error.rs
+```
+
+Codes hiện có: `APP_INTERNAL`, `APP_NOT_READY`, `CONFIG_INVALID`, `STORAGE_WRITE_FAILED`,
+`NETWORK_UNAVAILABLE`, `IPC_SESSION_STALE`, `INSTANCE_LOCKED`, `JAVA_NOT_FOUND`, `MC_VERSION_UNKNOWN`.
+
+Thêm code mới = thêm cả 2 phía + test.
+
+## Event envelope + QoS (§88.3, §32, §93)
+
+Rust emit lên channel `antares://event` với shape:
+
+```json
+{
+  "id": "evt_...",
+  "schema": 1,
+  "topic": "runtime | download | diagnostics | notification | telemetry | app",
+  "qos": "latest | coalesce | batched | lossless",
+  "name": "runtime.fps",
+  "timestampMs": 0,
+  "correlationId": null,
+  "payload": {}
+}
+```
+
+Pipeline UI (§93):
+
+```text
+Rust → listen('antares://event') → ingestRaw (validate)
+     → QoS buffers → requestAnimationFrame flush → subscribers
+```
+
+- `latest` — FPS/CPU: chỉ giữ giá trị mới nhất theo `name`
+- `coalesce` — download progress: gộp theo `payload.key`
+- `batched` — console lines: gom nhiều, flush 1 lần
+- `lossless` — critical error: không bao giờ drop
+- Schema lệch (envelope.schema > CURRENT) → reject an toàn, đếm vào `qosDropped` (§31)
+
+## Command registry
+
+Thêm command mới theo 4 bước:
+
+1. Rust: handler trong `src-tauri/src/commands/<domain>.rs` trả `AntaresResponse<T>`
+2. Rust: đăng ký trong `lib.rs` `invoke_handler`
+3. TS: entry trong `types/commands.ts` `CommandSchema`
+4. TS: helper trong `services/<domain>Commands.ts` + browser fallback nếu cần dev offline
+
+Quy tắc: command handler chỉ map request → service → response, không chứa business logic (§88.2).
+
+## Tests
+
+```text
+apps/desktop/tests/services/eventIngestion.test.ts  — QoS pipeline (8 tests)
+apps/desktop/tests/services/ipc.test.ts             — typed ipc + catalog (7 tests)
+src-tauri/src/protocol/*.rs                          — #[cfg(test)] unit tests (cargo test)
+```

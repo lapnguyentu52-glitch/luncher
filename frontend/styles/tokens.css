@@ -1,0 +1,250 @@
+/* ============================================================
+   Tokens — Antares Launcher design system (spec mục 25, 154, 326-329)
+   Bố cục: tokens.css -> base.css -> layout.css -> components.css
+            -> views.css -> animations.css
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Surfaces (nền) ---- */
+  --bg-0: #06070b;
+  --bg-1: #0b0d13;
+  --bg-2: #11141c;
+  --bg-3: #171b25;
+  --bg-4: #1e2330;
+  --bg-hover: rgba(255, 255, 255, .045);
+  --bg-active: rgba(255, 255, 255, .075);
+
+  /* Kính mờ / overlay */
+  --glass: rgba(17, 20, 28, .72);
+  --glass-strong: rgba(9, 11, 16, .82);
+  --scrim: rgba(4, 5, 8, .66);
+
+  /* ---- Text ---- */
+  --text-0: #f6f7fb;
+  --text-1: #c3c9d6;
+  --text-2: #858d9d;
+  --text-3: #5b6272;
+
+  /* ---- Accent (đỏ Antares) ---- */
+  --accent-0: #ff5c47;
+  --accent-1: #ff8a70;
+  --accent-2: #ffd08a;
+  --accent-deep: #c8351f;
+  --accent-soft: rgba(255, 92, 71, .14);
+  --accent-ring: rgba(255, 92, 71, .38);
+  --accent-glow: 0 0 0 1px rgba(255, 92, 71, .28), 0 12px 32px -12px rgba(255, 92, 71, .55);
+  --accent-gradient: linear-gradient(135deg, #ff7a5c 0%, #ff5c47 45%, #e0361d 100%);
+
+  /* ---- Semantic ---- */
+  --success: #2ad07f;
+  --success-soft: rgba(42, 208, 127, .14);
+  --warning: #f2b544;
+  --warning-soft: rgba(242, 181, 68, .14);
+  --danger: #f2555f;
+  --danger-soft: rgba(242, 85, 95, .14);
+  --info: #5ea0ff;
+  --info-soft: rgba(94, 160, 255, .14);
+
+  /* ---- Borders / rings ---- */
+  --border-0: rgba(255, 255, 255, .055);
+  --border-1: rgba(255, 255, 255, .095);
+  --border-2: rgba(255, 255, 255, .16);
+  --focus-ring: 0 0 0 3px var(--accent-ring);
+
+  /* ---- Radius ---- */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 13px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Typography (font-scale nhân mọi cỡ — Settings → Appearance, UX-5) ---- */
+  --font-scale: 1;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+    "Inter", Roboto, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "SFMono-Regular",
+    ui-monospace, monospace;
+  --fs-xs: calc(11px * var(--font-scale));
+  --fs-sm: calc(12px * var(--font-scale));
+  --fs-md: calc(13px * var(--font-scale));
+  --fs-base: calc(14px * var(--font-scale));
+  --fs-lg: calc(16px * var(--font-scale));
+  --fs-xl: calc(20px * var(--font-scale));
+  --fs-2xl: calc(26px * var(--font-scale));
+  --fs-3xl: calc(34px * var(--font-scale));
+  --weight-normal: 450;
+  --weight-medium: 550;
+  --weight-bold: 700;
+
+  /* ---- Glass blur budget (UX-1: chuẩn hoá, ≤14px — docs/UIUX-UPGRADE.md §2.2) ---- */
+  --blur-scrim: 4px;    /* overlay mờ nhẹ sau modal */
+  --blur-glass: 12px;   /* topbar/palette/modal mặc định */
+  --blur-strong: 14px;  /* surface nổi nhất (command palette) */
+
+  /* ---- Density (UX-5: comfortable=1 / compact=.8) ---- */
+  --density: 1;
+
+  /* ---- Elevation ---- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 8px 24px -12px rgba(0, 0, 0, .7);
+  --shadow-3: 0 24px 60px -24px rgba(0, 0, 0, .85);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .04);
+
+  /* ---- Motion ---- */
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-normal: 220ms;
+  --motion-slow: 380ms;
+  --ease-out: cubic-bezier(.22, .68, .36, 1);
+  --ease-in-out: cubic-bezier(.55, .06, .32, 1);
+  --ease-spring: cubic-bezier(.34, 1.42, .48, 1);
+
+  /* ---- Layout metrics ---- */
+  --sidebar-w: 244px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 58px;
+  --statusbar-h: 28px;
+  --content-max: 1180px;
+
+  /* ---- z-index ladder ---- */
+  --z-content: 1;
+  --z-topbar: 40;
+  --z-sidebar: 50;
+  --z-statusbar: 60;
+  --z-tooltip: 200;
+  --z-modal: 900;
+  --z-toast: 1000;
+  --z-splash: 1200;
+}
+
+/* ---- Accent variants (Settings → Appearance) ---- */
+[data-accent="gold"] {
+  --accent-0: #f5c842;
+  --accent-1: #ffd977;
+  --accent-2: #fff0c2;
+  --accent-deep: #b98d0d;
+  --accent-soft: rgba(245, 200, 66, .14);
+  --accent-ring: rgba(245, 200, 66, .38);
+  --accent-glow: 0 0 0 1px rgba(245, 200, 66, .28), 0 12px 32px -12px rgba(245, 200, 66, .5);
+  --accent-gradient: linear-gradient(135deg, #ffd977 0%, #f5c842 45%, #d69f14 100%);
+}
+
+[data-accent="blue"] {
+  --accent-0: #4d8dff;
+  --accent-1: #7cb0ff;
+  --accent-2: #cfe1ff;
+  --accent-deep: #2a5fd0;
+  --accent-soft: rgba(77, 141, 255, .14);
+  --accent-ring: rgba(77, 141, 255, .38);
+  --accent-glow: 0 0 0 1px rgba(77, 141, 255, .28), 0 12px 32px -12px rgba(77, 141, 255, .5);
+  --accent-gradient: linear-gradient(135deg, #7cb0ff 0%, #4d8dff 45%, #2a5fd0 100%);
+}
+
+[data-accent="violet"] {
+  --accent-0: #a06bff;
+  --accent-1: #c19bff;
+  --accent-2: #e6d8ff;
+  --accent-deep: #6d34d6;
+  --accent-soft: rgba(160, 107, 255, .14);
+  --accent-ring: rgba(160, 107, 255, .38);
+  --accent-glow: 0 0 0 1px rgba(160, 107, 255, .28), 0 12px 32px -12px rgba(160, 107, 255, .5);
+  --accent-gradient: linear-gradient(135deg, #c19bff 0%, #a06bff 45%, #6d34d6 100%);
+}
+
+[data-accent="teal"] {
+  --accent-0: #1fc2b4;
+  --accent-1: #5fdcd0;
+  --accent-2: #c2f4ee;
+  --accent-deep: #0d8c80;
+  --accent-soft: rgba(31, 194, 180, .14);
+  --accent-ring: rgba(31, 194, 180, .38);
+  --accent-glow: 0 0 0 1px rgba(31, 194, 180, .28), 0 12px 32px -12px rgba(31, 194, 180, .5);
+  --accent-gradient: linear-gradient(135deg, #5fdcd0 0%, #1fc2b4 45%, #0d8c80 100%);
+}
+
+[data-accent="magenta"] {
+  --accent-0: #d54fd6;
+  --accent-1: #e58ce5;
+  --accent-2: #f8d7f8;
+  --accent-deep: #9c1f9e;
+  --accent-soft: rgba(213, 79, 214, .14);
+  --accent-ring: rgba(213, 79, 214, .38);
+  --accent-glow: 0 0 0 1px rgba(213, 79, 214, .28), 0 12px 32px -12px rgba(213, 79, 214, .5);
+  --accent-gradient: linear-gradient(135deg, #e58ce5 0%, #d54fd6 45%, #9c1f9e 100%);
+}
+
+/* ---- Density (UX-5): compact ép padding card + gap section ---- */
+[data-density="compact"] {
+  --space-4: 12px;
+  --space-5: 15px;
+  --space-6: 18px;
+}
+
+/* ---- Light theme (Settings → Appearance: Dark / Light) ---- */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-0: #eef0f4;
+  --bg-1: #f7f8fb;
+  --bg-2: #ffffff;
+  --bg-3: #f1f3f8;
+  --bg-4: #e6e9f0;
+  --bg-hover: rgba(10, 14, 25, .045);
+  --bg-active: rgba(10, 14, 25, .075);
+  --glass: rgba(255, 255, 255, .74);
+  --glass-strong: rgba(255, 255, 255, .88);
+  --scrim: rgba(30, 36, 48, .38);
+  --text-0: #12151f;
+  --text-1: #3b4252;
+  --text-2: #6b7385;
+  --text-3: #9aa1b1;
+  --border-0: rgba(12, 18, 32, .08);
+  --border-1: rgba(12, 18, 32, .14);
+  --border-2: rgba(12, 18, 32, .22);
+  --shadow-1: 0 1px 2px rgba(19, 26, 43, .09);
+  --shadow-2: 0 10px 26px -14px rgba(19, 26, 43, .3);
+  --shadow-3: 0 24px 60px -28px rgba(19, 26, 43, .4);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+
+/* ---- Reduced motion (spec 154): tắt animation nặng ---- */
+[data-motion="reduced"] {
+  --motion-instant: 0ms;
+  --motion-fast: 0ms;
+  --motion-normal: 0ms;
+  --motion-slow: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms;
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+    --motion-slow: 0ms;
+  }
+}
+
+/* UX-5: người dùng cần tương phản cao -> viền rõ hơn (WCAG) */
+@media (prefers-contrast: more) {
+  :root {
+    --border-1: rgba(255, 255, 255, .18);
+    --border-2: rgba(255, 255, 255, .3);
+    --text-2: #9aa3b5;
+  }
+  [data-theme="light"] {
+    --border-1: rgba(12, 18, 32, .22);
+    --border-2: rgba(12, 18, 32, .36);
+  }
+}
