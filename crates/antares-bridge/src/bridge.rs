@@ -132,10 +132,16 @@ impl LegacyBridge {
         for (key, value) in self.env.lock().iter() {
             cmd.env(key, value);
         }
+        // §4.5 — không nháy console window khi spawn từ UI (Windows).
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
         let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|source| {
                 *self.status.write() = BridgeStatus::Failed(source.to_string());
@@ -150,6 +156,19 @@ impl LegacyBridge {
             .stdout
             .take()
             .ok_or_else(|| BridgeError::Protocol("no stdout".into()))?;
+
+        // §4.5 — stderr: log từng dòng thay vì nuốt (traceback Python phải
+        // tới Diagnostics/log launcher).
+        if let Some(stderr) = child.stderr.take() {
+            let _ = std::thread::Builder::new()
+                .name("sidecar-stderr".into())
+                .spawn(move || {
+                    use std::io::BufRead;
+                    for line in std::io::BufReader::new(stderr).lines().map_while(Result::ok) {
+                        log::warn!("sidecar stderr: {line}");
+                    }
+                });
+        }
 
         {
             *self.child.lock() = Some(child);

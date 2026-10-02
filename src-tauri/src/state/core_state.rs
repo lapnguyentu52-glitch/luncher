@@ -72,9 +72,9 @@ impl CoreState {
         }
     }
 
-    /// Accessor legacy bridge — mọi method đều `&self` (interior mutability).
-    pub fn legacy(&self) -> &LegacyBridge {
-        &self.legacy_bridge
+    /// Accessor legacy bridge — trả Arc để clone vào thread/blocking task.
+    pub fn legacy(&self) -> Arc<LegacyBridge> {
+        Arc::clone(&self.legacy_bridge)
     }
 }
 

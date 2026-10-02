@@ -1,6 +1,7 @@
 use antares_bridge::protocol::VersionInfo;
 use antares_bridge::BridgeError;
 use serde::Serialize;
+use tauri::Manager;
 
 use crate::protocol::error::AntaresError;
 use crate::protocol::response::AntaresResponse;
@@ -26,10 +27,17 @@ pub fn legacy_status(state: tauri::State<'_, CoreState>) -> AntaresResponse<Lega
     })
 }
 
+/// §5.3 — bridge commands là async + spawn_blocking: timeout 10s (call) hay
+/// 3s (shutdown) không được chặn UI thread. Dùng AppHandle (owned) thay vì
+/// State<'_> để async command không bắt buộc trả Result (Tauri yêu cầu
+/// input có reference ⇒ Result, mà envelope AntaresResponse đã là contract).
 #[tauri::command]
-pub fn legacy_start(state: tauri::State<'_, CoreState>) -> AntaresResponse<VersionInfo> {
-    let legacy = state.legacy();
-    result_to_response(legacy.start())
+pub async fn legacy_start(app: tauri::AppHandle) -> AntaresResponse<VersionInfo> {
+    let legacy = app.state::<CoreState>().legacy();
+    match tauri::async_runtime::spawn_blocking(move || legacy.start()).await {
+        Ok(result) => result_to_response(result),
+        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+    }
 }
 
 /// §4.2 — allowlist group method hợp lệ của sidecar (contract §43/§234,
@@ -83,8 +91,8 @@ pub fn is_allowed_legacy_method(method: &str) -> bool {
 /// thiếu → chuẩn hóa thành `{}` đúng format request sidecar.
 /// Method phải qua allowlist group (§4.2) trước khi chạm sidecar.
 #[tauri::command]
-pub fn legacy_call(
-    state: tauri::State<'_, CoreState>,
+pub async fn legacy_call(
+    app: tauri::AppHandle,
     method: String,
     params: Option<serde_json::Value>,
     timeout_ms: Option<u64>,
@@ -96,25 +104,41 @@ pub fn legacy_call(
             false,
         ));
     }
-    let legacy = state.legacy();
+    let legacy = app.state::<CoreState>().legacy();
     let params = params.unwrap_or_else(|| serde_json::json!({}));
-    let result = match timeout_ms {
+    match tauri::async_runtime::spawn_blocking(move || match timeout_ms {
         Some(ms) => legacy.call_with_timeout(&method, params, ms),
         None => legacy.call(&method, params),
-    };
-    result_to_response(result)
+    })
+    .await
+    {
+        Ok(result) => result_to_response(result),
+        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+    }
 }
 
 #[tauri::command]
-pub fn legacy_restart(state: tauri::State<'_, CoreState>) -> AntaresResponse<VersionInfo> {
-    let legacy = state.legacy();
-    result_to_response(legacy.restart())
+pub async fn legacy_restart(app: tauri::AppHandle) -> AntaresResponse<VersionInfo> {
+    let legacy = app.state::<CoreState>().legacy();
+    match tauri::async_runtime::spawn_blocking(move || legacy.restart()).await {
+        Ok(result) => result_to_response(result),
+        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+    }
 }
 
 #[tauri::command]
-pub fn legacy_shutdown(state: tauri::State<'_, CoreState>) -> AntaresResponse<serde_json::Value> {
-    let legacy = state.legacy();
-    result_to_response(legacy.shutdown(std::time::Duration::from_secs(3)).map(|()| serde_json::json!({ "stopped": true })))
+pub async fn legacy_shutdown(app: tauri::AppHandle) -> AntaresResponse<serde_json::Value> {
+    let legacy = app.state::<CoreState>().legacy();
+    match tauri::async_runtime::spawn_blocking(move || {
+        legacy
+            .shutdown(std::time::Duration::from_secs(3))
+            .map(|()| serde_json::json!({ "stopped": true }))
+    })
+    .await
+    {
+        Ok(result) => result_to_response(result),
+        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+    }
 }
 
 fn result_to_response<T: Serialize>(result: antares_bridge::BridgeResult<T>) -> AntaresResponse<T> {
