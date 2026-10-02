@@ -508,24 +508,18 @@ mod tests {
     }
 
 fn set_mtime(path: &Path, epoch: f64) {
-    #[cfg(unix)]
-    {
-        use std::time::{Duration, UNIX_EPOCH};
-        let st = UNIX_EPOCH
-            .checked_add(Duration::from_secs_f64(epoch.max(0.0)))
-            .unwrap();
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(path)
-            .expect("open for mtime");
-        file.set_times(std::fs::FileTimes::new().set_modified(st))
-            .expect("set mtime");
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = (path, epoch);
-        // Windows CI: không set mtime — file mới → age 0.0 (không vào nhóm cũ).
-    }
+    // `File::set_times` cross-platform (Windows qua SetFileTime) — trước đây
+    // nhánh non-unix là no-op → file age=0 → scan test fail trên Windows CI.
+    use std::time::{Duration, UNIX_EPOCH};
+    let st = UNIX_EPOCH
+        .checked_add(Duration::from_secs_f64(epoch.max(0.0)))
+        .unwrap();
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .expect("open for mtime");
+    file.set_times(std::fs::FileTimes::new().set_modified(st))
+        .expect("set mtime");
 }
 
     #[test]
