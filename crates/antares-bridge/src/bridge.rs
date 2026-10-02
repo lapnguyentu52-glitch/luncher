@@ -95,7 +95,8 @@ impl LegacyBridge {
     }
 
     /// §234 — Spawn sidecar + version handshake. Trả VersionInfo nếu handshake OK.
-    pub fn start(&self) -> BridgeResult<VersionInfo> {
+    /// `self: Arc<Self>` — reader thread giữ Arc để tựsupervise khi stdout EOF (F-11).
+    pub fn start(self: Arc<Self>) -> BridgeResult<VersionInfo> {
         let program = {
             let guard = self.program.lock();
             match guard.as_ref() {
@@ -175,7 +176,7 @@ impl LegacyBridge {
             *self.stdin.lock() = Some(stdin);
         }
 
-        self.spawn_reader(stdout);
+        Self::spawn_reader(Arc::clone(&self), stdout);
 
         // §234 — version handshake với timeout
         let info: VersionInfo = serde_json::from_value(
@@ -205,9 +206,9 @@ impl LegacyBridge {
         Ok(info)
     }
 
-    fn spawn_reader(&self, stdout: std::process::ChildStdout) {
-        let pending = Arc::clone(&self.pending);
-        let tx = self.notifications_tx.clone();
+    fn spawn_reader(bridge: Arc<LegacyBridge>, stdout: std::process::ChildStdout) {
+        let pending = Arc::clone(&bridge.pending);
+        let tx = bridge.notifications_tx.clone();
         std::thread::Builder::new()
             .name("antares-bridge-reader".into())
             .spawn(move || {
@@ -259,9 +260,71 @@ impl LegacyBridge {
                         }
                     }
                 }
-                // stdout đóng = sidecar thoát — crash detection ở wait/restart layer
+                // F-11 — stdout đóng: sidecar thoát/crash → supervisor tự cập nhật
+                // state + dọn pending ngay, không chờ check_health poll.
+                bridge.on_stdout_closed();
             })
             .expect("spawn bridge reader");
+    }
+
+    /// F-11 — stdout EOF handler: reap process, đánh dấu Failed (chỉ khi đang
+    /// vận hành — shutdown/restart chủ động đã set Stopped trước khi kill nên
+    /// không tính là crash), tăng crash_count, trả NotRunning cho pending calls
+    /// đang chờ (thay vì treo tới timeout).
+    fn on_stdout_closed(&self) {
+        let detail = {
+            let mut child_guard = self.child.lock();
+            let mut detail = String::from("sidecar stdout closed");
+            match child_guard.as_mut() {
+                Some(child) => match child.try_wait() {
+                    Ok(Some(exit)) => {
+                        // `signal()` chỉ có trên unix (ExitStatusExt) — Windows chỉ log code.
+                        #[cfg(unix)]
+                        let signal = {
+                            use std::os::unix::process::ExitStatusExt;
+                            exit.signal()
+                        };
+                        #[cfg(not(unix))]
+                        let signal: Option<i32> = None;
+                        detail = format!(
+                            "sidecar exited: code={:?}, signal={signal:?}",
+                            exit.code()
+                        );
+                        *child_guard = None; // đã reap — không zombie
+                    }
+                    Ok(None) => {
+                        // stdout đóng nhưng process chưa exit — bất thường → kill,
+                        // không leak process.
+                        log::warn!("bridge EOF while process still running — killing");
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        *child_guard = None;
+                        detail = "stdout closed while process running (killed)".into();
+                    }
+                    Err(err) => {
+                        detail = format!("wait failed: {err}");
+                        *child_guard = None;
+                    }
+                },
+                None => {} // child đã được reap bởi shutdown/restart/check_health
+            }
+            detail
+        };
+        // Guard đồng bộ trong1 write lock: chỉ đánh dấu khi đang vận hành.
+        {
+            let mut status = self.status.write();
+            if !matches!(*status, BridgeStatus::Ready | BridgeStatus::Starting) {
+                return; // Stopped (chủ động) hoặc đã Failed — không đếm trùng crash
+            }
+            log::warn!("bridge supervisor: {detail}");
+            *status = BridgeStatus::Failed(detail.clone());
+        }
+        self.crash_count.fetch_add(1, Ordering::Relaxed);
+        // Dọn pending calls đang treo — trả NotRunning ngay.
+        let mut pending = self.pending.lock();
+        for (_, call) in pending.drain() {
+            let _ = call.respond_to.send(Err(BridgeError::NotRunning));
+        }
     }
 
     fn call_internal(
@@ -372,7 +435,10 @@ impl LegacyBridge {
     }
 
     /// §234 — Restart: kill hiện tại (nếu có) rồi start lại với handshake mới.
-    pub fn restart(&self) -> BridgeResult<VersionInfo> {
+    /// `self: Arc<Self>` — start nhận Arc (F-11).
+    pub fn restart(self: Arc<Self>) -> BridgeResult<VersionInfo> {
+        // F-11 — đánh dấu ngay: EOF trong lúc kill là chủ động, không tính crash.
+        *self.status.write() = BridgeStatus::Stopped;
         self.kill_internal();
         *self.child.lock() = None;
         *self.stdin.lock() = None;
@@ -381,7 +447,11 @@ impl LegacyBridge {
 
     /// §234 — Graceful shutdown: gửi health.shutdown, đợi exit, kill nếu cần.
     pub fn shutdown(&self, grace: Duration) -> BridgeResult<()> {
-        if matches!(self.status(), BridgeStatus::Ready) {
+        let was_ready = matches!(self.status(), BridgeStatus::Ready);
+        // F-11 — đánh dấu DỪNG trước: mọi EOF từ đây là chủ động, không tính crash
+        // (đặt trước graceful call vì sidecar có thể thoát trước khi kill).
+        *self.status.write() = BridgeStatus::Stopped;
+        if was_ready {
             // best-effort graceful — không xử lý kết quả
             let _ = self.call_internal(
                 crate::protocol::methods::SHUTDOWN,
@@ -391,7 +461,6 @@ impl LegacyBridge {
             std::thread::sleep(Duration::from_millis(100));
         }
         self.kill_internal_with_wait(grace);
-        *self.status.write() = BridgeStatus::Stopped;
         *self.version.write() = None;
         Ok(())
     }
@@ -463,6 +532,10 @@ for line in sys.stdin:
             "root": os.environ.get("ANTARES_ROOT", "")}}
     elif req.get("method") == "echo":
         out = {"id": req["id"], "ok": True, "data": req.get("params", {})}
+    elif req.get("method") == "bye":
+        out = {"id": req["id"], "ok": True, "data": {"bye": True}}
+        sys.stdout.write(json.dumps(out) + "\n"); sys.stdout.flush()
+        sys.exit(0)
     elif req.get("method") == "health.shutdown":
         out = {"id": req["id"], "ok": True, "data": {"stopping": True}}
         sys.stdout.write(json.dumps(out) + "\n"); sys.stdout.flush()
@@ -483,7 +556,7 @@ for line in sys.stdin:
         let bridge = LegacyBridge::new();
         bridge.set_program(format!("python3 {}", script.display()));
 
-        let info = bridge.start().expect("handshake");
+        let info = Arc::clone(&bridge).start().expect("handshake");
         assert_eq!(info.protocol, PROTOCOL_VERSION);
         assert_eq!(info.service, "antares-legacy");
         assert_eq!(bridge.status(), BridgeStatus::Ready);
@@ -502,6 +575,51 @@ for line in sys.stdin:
 
         bridge.shutdown(Duration::from_secs(3)).expect("shutdown");
         assert_eq!(bridge.status(), BridgeStatus::Stopped);
+        // F-11 — shutdown chủ động không tính là crash
+        assert_eq!(bridge.crash_count(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// F-11 — sidecar thoát giữa chừng: supervisor tự cập nhật state
+    /// (không cần check_health poll), tăng crash_count, call sau đó trả ngay
+    /// NotRunning thay vì treo timeout.
+    #[test]
+    fn sidecar_exit_marks_failed_without_polling() {
+        let dir = std::env::temp_dir().join(format!("antares-bridge-sup-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let script = dir.join("mock_sidecar.py");
+        std::fs::write(&script, MOCK_SIDECAR).expect("write mock");
+
+        let bridge = LegacyBridge::new();
+        bridge.set_program(format!("python3 {}", script.display()));
+        Arc::clone(&bridge).start().expect("handshake");
+        assert_eq!(bridge.status(), BridgeStatus::Ready);
+
+        // "bye" — mock trả response rồi exit(0) ngay → stdout EOF
+        let bye = bridge
+            .call("bye", serde_json::json!({}))
+            .expect("response trước khi thoát");
+        assert_eq!(bye["bye"], true);
+
+        // KHÔNG gọi check_health — đợi supervisor tự phát hiện
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while matches!(bridge.status(), BridgeStatus::Ready | BridgeStatus::Starting)
+            && std::time::Instant::now() < deadline
+        {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            matches!(bridge.status(), BridgeStatus::Failed(_)),
+            "status = {:?}",
+            bridge.status()
+        );
+        assert!(bridge.crash_count() >= 1, "crash_count phải tăng");
+
+        // Call sau crash → NotRunning ngay (không chờ timeout 10s)
+        assert!(matches!(
+            bridge.call(crate::protocol::methods::PING, serde_json::json!({})),
+            Err(BridgeError::NotRunning)
+        ));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -518,7 +636,7 @@ for line in sys.stdin:
         bridge.set_env("ANTARES_DATA_DIR", "/tmp/antares-data-test");
         bridge.set_env("ANTARES_ROOT", "/tmp/antares-root-test");
 
-        bridge.start().expect("handshake");
+        Arc::clone(&bridge).start().expect("handshake");
         let env = bridge.call("env", serde_json::json!({})).expect("env");
         assert_eq!(env["dataDir"], "/tmp/antares-data-test");
         assert_eq!(env["root"], "/tmp/antares-root-test");
