@@ -97,6 +97,10 @@ fn transition_allowed(from: TaskState, to: TaskState) -> bool {
 }
 
 /// TaskRegistry: tạo/transition task, dedupe theo key (§169), snapshot list.
+
+/// Giới hạn history in-memory (Batch 01 — bounded task history): vượt cap →
+/// dọn task terminal cũ nhất để tasks/queue không tích lũy vô hạn.
+const MAX_TASK_HISTORY: usize = 512;
 pub struct TaskRegistry {
     tasks: RwLock<HashMap<String, Task>>,
     queue: Mutex<Vec<String>>,
@@ -141,6 +145,7 @@ impl TaskRegistry {
         {
             let mut tasks = self.tasks.write();
             tasks.insert(task.id.clone(), task.clone());
+            evict_over_cap(&mut tasks, &self.queue);
         }
         self.queue.lock().push(task.id.clone());
         if let Some(key) = dedupe_key {
@@ -186,12 +191,16 @@ impl TaskRegistry {
     }
 
     pub fn fail(&self, task_id: &str, message: impl Into<String>) -> CoreResult<Task> {
-        let task = self.transition(task_id, TaskState::Failed)?;
+        // F-03 — transition trước, rồi set message và clone KẾT QUẢ cuối cùng.
+        // Bản cũ clone ngay lúc transition (chưa có message) rồi mới ghi message
+        // vào store → caller nhận Task không có failure message.
+        self.transition(task_id, TaskState::Failed)?;
         let mut tasks = self.tasks.write();
-        if let Some(t) = tasks.get_mut(task_id) {
-            t.message = Some(message.into());
-        }
-        Ok(task)
+        let task = tasks
+            .get_mut(task_id)
+            .ok_or_else(|| CoreError::TaskNotFound(task_id.to_string()))?;
+        task.message = Some(message.into());
+        Ok(task.clone())
     }
 
     pub fn request_cancel(&self, task_id: &str) -> CoreResult<Task> {
@@ -248,12 +257,51 @@ impl TaskRegistry {
         let now = now_ms();
         let mut tasks = self.tasks.write();
         let before = tasks.len();
-        tasks.retain(|_, t| {
-            !(t.state.is_terminal()
+        let mut removed: Vec<String> = Vec::new();
+        tasks.retain(|id, t| {
+            let kill = t.state.is_terminal()
                 && t.finished_at_ms
-                    .is_some_and(|ts| now.saturating_sub(ts) >= older_than_ms))
+                    .is_some_and(|ts| now.saturating_sub(ts) >= older_than_ms);
+            if kill {
+                removed.push(id.clone());
+            }
+            !kill
         });
+        // Queue không được giữ id của task đã xoá (lifecycle Batch 01).
+        if !removed.is_empty() {
+            let mut queue = self.queue.lock();
+            queue.retain(|id| !removed.contains(id));
+        }
         before - tasks.len()
+    }
+}
+
+/// Dọn task terminal cũ nhất khi vượt [`MAX_TASK_HISTORY`] + gỡ id khỏi queue.
+/// Gọi trong khi đang giữ `tasks` write lock; tự lấy `queue` lock theo thứ tự
+/// tasks → queue (không chỗ nào lấy ngược).
+fn evict_over_cap(tasks: &mut HashMap<String, Task>, queue: &Mutex<Vec<String>>) {
+    if tasks.len() <= MAX_TASK_HISTORY {
+        return;
+    }
+    let mut finished: Vec<(u64, String)> = tasks
+        .iter()
+        .filter(|(_, t)| t.state.is_terminal())
+        .map(|(id, t)| (t.finished_at_ms.unwrap_or(0), id.clone()))
+        .collect();
+    finished.sort_unstable();
+    let mut excess = tasks.len().saturating_sub(MAX_TASK_HISTORY);
+    let mut evicted: Vec<String> = Vec::new();
+    for (_, id) in finished {
+        if excess == 0 {
+            break;
+        }
+        tasks.remove(&id);
+        evicted.push(id);
+        excess -= 1;
+    }
+    if !evicted.is_empty() {
+        let mut queue = queue.lock();
+        queue.retain(|id| !evicted.contains(id));
     }
 }
 
@@ -356,6 +404,58 @@ mod tests {
         registry.start(&task.id).expect("start");
         let updated = registry.set_progress(&task.id, 1.7, None).expect("progress");
         assert!((updated.progress - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn fail_returns_and_stores_failure_message() {
+        // F-03 regression — cả returned lẫn stored Task phải có message.
+        let registry = TaskRegistry::new();
+        let task = registry.spawn("download", TaskPriority::P1UserAction, None).expect("spawn");
+        registry.start(&task.id).expect("start");
+
+        let failed = registry.fail(&task.id, "boom").expect("fail");
+        assert_eq!(failed.message.as_deref(), Some("boom"));
+        assert_eq!(failed.state, TaskState::Failed);
+
+        let stored = registry.get(&task.id).expect("stored");
+        assert_eq!(stored.message.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn task_history_evicts_terminal_at_cap() {
+        let registry = TaskRegistry::new();
+        let mut ids = Vec::new();
+        for i in 0..(MAX_TASK_HISTORY + 10) {
+            let t = registry
+                .spawn(format!("k{i}"), TaskPriority::P3Prefetch, None)
+                .expect("spawn");
+            registry.start(&t.id).expect("start");
+            registry.complete(&t.id).expect("complete");
+            ids.push(t.id);
+        }
+        // History bị cap: không quá MAX_TASK_HISTORY, ít nhất 10 task cũ bị dọn.
+        // (Không assert theo id cụ thể — timestamp có thể trùng millisecond,
+        // tie-break theo id string không ổn định giữa các lần chạy.)
+        let tasks_map = registry.tasks.read();
+        assert!(
+            tasks_map.len() <= MAX_TASK_HISTORY,
+            "history phải ≤ cap: {}",
+            tasks_map.len()
+        );
+        let evicted: Vec<String> = ids
+            .iter()
+            .filter(|id| !tasks_map.contains_key(*id))
+            .cloned()
+            .collect();
+        assert!(evicted.len() >= 10, "cần dọn ≥10 task cũ: {}", evicted.len());
+        assert!(tasks_map.contains_key(ids.last().unwrap()), "task mới nhất phải còn");
+        drop(tasks_map);
+        // queue không giữ id đã evict
+        let queue = registry.queue.lock();
+        for id in &evicted {
+            assert!(!queue.contains(id), "queue còn id đã evict: {id}");
+        }
+        assert!(queue.contains(ids.last().unwrap()));
     }
 
     #[test]

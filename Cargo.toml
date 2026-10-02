@@ -26,7 +26,9 @@ rust-version = "1.77"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: parse f64 đủ chính xác — mặc định serde_json parse heuristic
+# làm timestamp trôi precision khi roundtrip qua file (f64 .0049865 → .0049863).
+serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 log = "0.4"
 parking_lot = "0.12"
