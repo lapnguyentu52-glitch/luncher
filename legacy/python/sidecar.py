@@ -88,16 +88,32 @@ def notify(event: str, payload: Any = None) -> None:
 
 _LEGACY_CTX: Any = None
 _LEGACY_CTX_ERROR: str | None = None
+_LEGACY_API: Any = None  # giữ AntaresApi sống qua vòng đời sidecar
 
 
 def _legacy_ctx() -> Any:
-    global _LEGACY_CTX, _LEGACY_CTX_ERROR
+    global _LEGACY_CTX, _LEGACY_CTX_ERROR, _LEGACY_API
     if _LEGACY_CTX is not None or _LEGACY_CTX_ERROR is not None:
         return _LEGACY_CTX
     try:
-        from app.context import AppContext
+        import os
 
-        ctx = AppContext.instance() if hasattr(AppContext, "instance") else AppContext()
+        from api.bridge.api import AntaresApi
+        from app.bootstrap import bootstrap
+
+        # Env do launcher (Rust) truyền khi spawn — thống nhất data dir
+        # giữa 2 phía (mục 5.1); thiếu fallback về root repo + data mặc định.
+        root_env = os.environ.get("ANTARES_ROOT")
+        data_env = os.environ.get("ANTARES_DATA_DIR")
+        root = Path(root_env) if root_env else REPO_ROOT
+        data_dir = Path(data_env) if data_env else None
+
+        # bootstrap() tạo AppContext nhưng CHƯA đăng ký service nào —
+        # services chỉ được ctx.set(...) trong AntaresApi._wire_services.
+        # Thiếu AntaresApi(ctx) → ctx.get("download_manager") trả None và
+        # handler ném AttributeError (LEGACY_UNAVAILABLE).
+        ctx = bootstrap(root=root, data_dir=data_dir)
+        _LEGACY_API = AntaresApi(ctx)
         _LEGACY_CTX = ctx
         return ctx
     except Exception as err:  # noqa: BLE001 — sidecar phải sống

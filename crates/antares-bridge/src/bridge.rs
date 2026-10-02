@@ -40,6 +40,8 @@ pub struct LegacyBridge {
     notifications_tx: Sender<BridgeNotification>,
     notifications_rx: Mutex<Option<Receiver<BridgeNotification>>>,
     crash_count: AtomicU64,
+    /// Env truyền thêm cho sidecar khi spawn (vd: ANTARES_DATA_DIR — mục 5.1).
+    env: Mutex<HashMap<String, String>>,
 }
 
 impl LegacyBridge {
@@ -59,11 +61,17 @@ impl LegacyBridge {
             notifications_tx: tx,
             notifications_rx: Mutex::new(Some(rx)),
             crash_count: AtomicU64::new(0),
+            env: Mutex::new(HashMap::new()),
         })
     }
 
     pub fn set_program(&self, program: impl Into<String>) {
         *self.program.lock() = Some(program.into());
+    }
+
+    /// Đặt biến môi trường truyền cho sidecar khi spawn (gọi trước `start`).
+    pub fn set_env(&self, key: impl Into<String>, value: impl Into<String>) {
+        self.env.lock().insert(key.into(), value.into());
     }
 
     pub fn program(&self) -> Option<String> {
@@ -120,6 +128,10 @@ impl LegacyBridge {
             c.args(parts);
             c
         };
+        // Env thống nhất dữ liệu giữa Rust và Python (mục 5.1).
+        for (key, value) in self.env.lock().iter() {
+            cmd.env(key, value);
+        }
         let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -425,6 +437,11 @@ for line in sys.stdin:
             "serviceVersion": "4.0.0", "python": platform.python_version()}}
     elif req.get("method") == "health.ping":
         out = {"id": req["id"], "ok": True, "data": {"pong": True}}
+    elif req.get("method") == "env":
+        import os
+        out = {"id": req["id"], "ok": True, "data": {
+            "dataDir": os.environ.get("ANTARES_DATA_DIR", ""),
+            "root": os.environ.get("ANTARES_ROOT", "")}}
     elif req.get("method") == "echo":
         out = {"id": req["id"], "ok": True, "data": req.get("params", {})}
     elif req.get("method") == "health.shutdown":
@@ -466,6 +483,28 @@ for line in sys.stdin:
 
         bridge.shutdown(Duration::from_secs(3)).expect("shutdown");
         assert_eq!(bridge.status(), BridgeStatus::Stopped);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Mục 5.1 — env do launcher đặt phải tới được process sidecar.
+    #[test]
+    fn spawn_passes_configured_env_to_sidecar() {
+        let dir = std::env::temp_dir().join(format!("antares-bridge-env-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let script = dir.join("mock_sidecar.py");
+        std::fs::write(&script, MOCK_SIDECAR).expect("write mock");
+
+        let bridge = LegacyBridge::new();
+        bridge.set_program(format!("python3 {}", script.display()));
+        bridge.set_env("ANTARES_DATA_DIR", "/tmp/antares-data-test");
+        bridge.set_env("ANTARES_ROOT", "/tmp/antares-root-test");
+
+        bridge.start().expect("handshake");
+        let env = bridge.call("env", serde_json::json!({})).expect("env");
+        assert_eq!(env["dataDir"], "/tmp/antares-data-test");
+        assert_eq!(env["root"], "/tmp/antares-root-test");
+
+        bridge.shutdown(Duration::from_secs(3)).expect("shutdown");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

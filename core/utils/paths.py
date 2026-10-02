@@ -22,7 +22,9 @@ def ensure_inside(parent: Path, child: Path) -> Path:
     """Raise ValueError nếu child nằm ngoài parent — chống ../ traversal."""
     parent_r = parent.resolve()
     child_r = child.resolve()
-    if not str(child_r).startswith(str(parent_r)):
+    # is_relative_to so từng path component — startswith bị bypass bằng
+    # anh em cùng tiền tố (parent/game → parent/game_evil).
+    if not child_r.is_relative_to(parent_r):
         raise ValueError(f"Path escapes allowed root: {child_r}")
     return child_r
 
