@@ -5,6 +5,14 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+# TLS cho HTTPS (F-01): ring thay aws-lc-rs — không cần cmake/nasm khi build Windows.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-native-certs = "0.8"
+
+[dev-dependencies]
+# Tạo self-signed cert cho test TLS local (không dựa mạng ngoài).
+rcgen = "0.14"

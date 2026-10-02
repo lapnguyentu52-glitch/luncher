@@ -10,16 +10,19 @@
 //! `status = 206` để pipeline quyết định append (parity `_attempt` legacy). Redirect
 //! KHÔNG kế thừa Range/auth header (an toàn).
 //!
-//! ## TLS seam (phase 4)
+//! ## TLS (phase 4 — F-01)
 //!
-//! Engine không link TLS crate. `https_url_to_http` là điểm nối duy nhất: bên trong
-//!Codespace/dev mọi URL https được map sang `http://127.0.0.1:1/` (chắc chắn không
-//! kết nối được) → error rõ ràng `NET_UNREACHABLE` kèm giải thích TLS chưa có; khi
-//! bundle, thay bằng TLS connector (native-tls/rustls) và xoá mapping này.
+//! HTTPS qua rustls + native cert store (Schannel/Security Framework/CA系统).
+//! Certificate validation bật theo mặc định — không có insecure fallback;
+//! handshake fail → error `NET_UNREACHABLE` có ngữ cảnh TLS.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+
+use rustls::pki_types::ServerName;
+use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpError {
@@ -65,6 +68,8 @@ pub fn parse_url(url: &str) -> Result<(String, u16, String), HttpError> {
             p.parse::<u16>()
                 .map_err(|_| HttpError::InvalidUrl(url.to_string()))?,
         ),
+        // Default port theo scheme: https không port → 443 (không phải 80).
+        None if scheme == "https" => (authority.to_string(), 443),
         None => (authority.to_string(), 80),
     };
     if host.is_empty() {
@@ -73,18 +78,67 @@ pub fn parse_url(url: &str) -> Result<(String, u16, String), HttpError> {
     Ok((host, port, path.to_string()))
 }
 
-/// ## TLS seam — phase 4
-///
-/// Engine chưa link TLS. URL https được map về `http://127.0.0.1:1/` — cổng không
-/// thể kết nối → gọi nhất định fail `NET_UNREACHABLE` với message giải thích.
-/// Khi bundle (Batch 16): thay bằng TLS connector, xoá hàm này.
-pub fn https_url_to_http(url: &str) -> String {
-    let (_host, _port, path) = parse_url(url).unwrap_or((
-        String::new(),
-        1,
-        "/".to_string(),
-    ));
-    format!("http://127.0.0.1:1{path}")
+/// Transport: plain TCP hoặc TLS (rustls) — Read/Write uniform với engine.
+enum Connection {
+    Plain(TcpStream),
+    Tls(StreamOwned<ClientConnection, TcpStream>),
+}
+
+impl Read for Connection {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Connection::Plain(s) => s.read(buf),
+            Connection::Tls(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for Connection {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Connection::Plain(s) => s.write(buf),
+            Connection::Tls(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Connection::Plain(s) => s.flush(),
+            Connection::Tls(s) => s.flush(),
+        }
+    }
+}
+
+/// Client config với root certs cho sẵn (test inject self-signed cert).
+fn build_client_config(roots: RootCertStore) -> Arc<ClientConfig> {
+    let mut config = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    // Engine chỉ speak HTTP/1.1 — không chào h2.
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Arc::new(config)
+}
+
+/// Config production: native cert store của OS (Schannel/Security Framework/CA bundle).
+fn client_config() -> Arc<ClientConfig> {
+    static CONFIG: OnceLock<Arc<ClientConfig>> = OnceLock::new();
+    CONFIG
+        .get_or_init(|| {
+            let mut roots = RootCertStore::empty();
+            let loaded = rustls_native_certs::load_native_certs();
+            for cert in &loaded.certs {
+                let _ = roots.add(cert.clone());
+            }
+            if !loaded.errors.is_empty() {
+                log::warn!(
+                    "native cert store: {} lỗi load ({:?})",
+                    loaded.errors.len(),
+                    loaded.errors.first().map(|e| e.to_string())
+                );
+            }
+            build_client_config(roots)
+        })
+        .clone()
 }
 
 /// Response thu gọn: status + headers (lowercase keys) + body bytes.
@@ -133,7 +187,17 @@ pub fn get(
     extra_headers: &[(String, String)],
     timeout: Duration,
 ) -> Result<HttpResponse, HttpError> {
-    let (head, body) = get_following_redirects(url, extra_headers, timeout, |reader, head| {
+    get_with_config(url, extra_headers, timeout, client_config())
+}
+
+/// `get` với client config chỉ định — test inject root cert riêng.
+fn get_with_config(
+    url: &str,
+    extra_headers: &[(String, String)],
+    timeout: Duration,
+    config: Arc<ClientConfig>,
+) -> Result<HttpResponse, HttpError> {
+    let (head, body) = get_following_redirects(url, extra_headers, timeout, config, |reader, head| {
         read_full_body(reader, head)
     })
     .map_err(|err| match err {
@@ -161,6 +225,7 @@ pub fn get_stream<E>(
         url,
         extra_headers,
         timeout,
+        client_config(),
         |reader, head| stream_body(reader, head, &mut on_chunk),
     )
     .map_err(|err| match err {
@@ -190,20 +255,17 @@ fn get_following_redirects<T, E>(
     url: &str,
     extra_headers: &[(String, String)],
     timeout: Duration,
-    mut read_body: impl FnMut(&mut BufReader<TcpStream>, &StreamHead) -> Result<T, FollowError<E>>,
+    config: Arc<ClientConfig>,
+    mut read_body: impl FnMut(&mut BufReader<Connection>, &StreamHead) -> Result<T, FollowError<E>>,
 ) -> Result<(StreamHead, T), FollowError<E>> {
-    // TLS seam: https hiện map sang cổng chết — fail rõ ràng thay vì lỗi mơ hồ.
-    let url = if url.starts_with("https://") {
-        https_url_to_http(url)
-    } else {
-        url.to_string()
-    };
-    let mut current = url;
+    let mut current = url.to_string();
     let mut redirects = 0;
     loop {
+        // Scheme theo từng hop — redirect có thể đổi http ↔ https (bảo toàn).
+        let tls = current.starts_with("https://");
         let (host, port, path) = parse_url(&current).map_err(FollowError::Http)?;
         let headers: &[(String, String)] = if redirects == 0 { extra_headers } else { &[] };
-        let (mut reader, head) = send_request(&host, port, &path, headers, timeout)
+        let (mut reader, head) = send_request(&host, port, &path, tls, headers, timeout, &config)
             .map_err(FollowError::Http)?;
         match head.status {
             301 | 302 | 303 | 307 | 308 => {
@@ -219,17 +281,16 @@ fn get_following_redirects<T, E>(
                         ))
                     })?
                     .to_string();
-                // relative → absolute cùng origin
+                // relative → absolute cùng origin + scheme hiện tại
                 current = if location.starts_with("http://") || location.starts_with("https://") {
-                    if location.starts_with("https://") {
-                        https_url_to_http(&location)
-                    } else {
-                        location
-                    }
-                } else if location.starts_with('/') {
-                    format!("http://{host}:{port}{location}")
+                    location
                 } else {
-                    format!("http://{host}:{port}/{location}")
+                    let scheme = if tls { "https" } else { "http" };
+                    if location.starts_with('/') {
+                        format!("{scheme}://{host}:{port}{location}")
+                    } else {
+                        format!("{scheme}://{host}:{port}/{location}")
+                    }
                 };
             }
             _ => {
@@ -240,22 +301,39 @@ fn get_following_redirects<T, E>(
     }
 }
 
-/// Gửi request, trả reader + head (chưa đọc body).
+/// Gửi request, trả reader + head (chưa đọc body). `tls=true` → handshake rustls
+/// sau khi connect (cert validation theo root store của config).
 fn send_request(
     host: &str,
     port: u16,
     path: &str,
+    tls: bool,
     extra_headers: &[(String, String)],
     timeout: Duration,
-) -> Result<(BufReader<TcpStream>, StreamHead), HttpError> {
-    let mut stream =
+    config: &Arc<ClientConfig>,
+) -> Result<(BufReader<Connection>, StreamHead), HttpError> {
+    let mut tcp =
         TcpStream::connect((host, port)).map_err(|err| HttpError::Io(err.to_string()))?;
-    stream
-        .set_read_timeout(Some(timeout))
+    tcp.set_read_timeout(Some(timeout))
         .map_err(|err| HttpError::Io(err.to_string()))?;
-    stream
-        .set_write_timeout(Some(timeout))
+    tcp.set_write_timeout(Some(timeout))
         .map_err(|err| HttpError::Io(err.to_string()))?;
+
+    let mut stream = if tls {
+        // ServerName::try_from validates host (DNS name hoặc IP literal).
+        let name = ServerName::try_from(host.to_string())
+            .map_err(|err| HttpError::InvalidUrl(format!("{host}: {err}")))?;
+        let mut conn =
+            ClientConnection::new(Arc::clone(config), name).map_err(|err| {
+                HttpError::Io(format!("TLS init failed: {err}"))
+            })?;
+        // Handshake đồng bộ — read/write timeout trên tcp đã set ở trên.
+        conn.complete_io(&mut tcp)
+            .map_err(|err| HttpError::Io(format!("TLS handshake failed: {err}")))?;
+        Connection::Tls(StreamOwned::new(conn, tcp))
+    } else {
+        Connection::Plain(tcp)
+    };
 
     let mut request = format!(
         "GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: antares-launcher\r\nAccept: */*\r\nConnection: close\r\n"
@@ -313,7 +391,7 @@ fn is_chunked(head: &StreamHead) -> bool {
 
 /// Buffer toàn bộ body (get) — cap MAX_BODY_BYTES.
 fn read_full_body(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<Connection>,
     head: &StreamHead,
 ) -> Result<Vec<u8>, FollowError<core::convert::Infallible>> {
     let body = if is_chunked(head) {
@@ -345,7 +423,7 @@ fn read_full_body(
 /// till-close. Callback user trả Err → dừng ngay và bubble `FollowError::User`
 /// (cancel giữa stream không bị nuốt thành lỗi HTTP).
 fn stream_body<E>(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<Connection>,
     head: &StreamHead,
     on_chunk: &mut impl FnMut(&[u8]) -> Result<(), E>,
 ) -> Result<(), FollowError<E>> {
@@ -405,7 +483,7 @@ fn stream_body<E>(
 }
 
 /// Đọc chunked body buffer-mode: `size hex\r\n<size bytes>\r\n` … `0\r\n\r\n`.
-fn read_chunked(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, HttpError> {
+fn read_chunked(reader: &mut BufReader<Connection>) -> Result<Vec<u8>, HttpError> {
     let mut body = Vec::new();
     loop {
         let mut size_line = String::new();
@@ -511,14 +589,130 @@ mod tests {
     }
 
     #[test]
-    fn https_seam_maps_to_dead_port() {
-        let mapped = https_url_to_http("https://example.com/a/b.jar");
-        assert_eq!(mapped, "http://127.0.0.1:1/a/b.jar");
-        // parse_url vẫn nhận https (schema hợp lệ) — seam xử lý ở tầng request.
-        assert!(parse_url("https://example.com/x").is_ok());
-        // get() qua https phải fail NET_UNREACHABLE (cổng chết), không panic.
+    fn parse_url_https_defaults_to_443() {
+        assert_eq!(
+            parse_url("https://example.com/x").unwrap(),
+            ("example.com".into(), 443, "/x".into())
+        );
+        assert_eq!(
+            parse_url("https://example.com:8443/x").unwrap(),
+            ("example.com".into(), 8443, "/x".into())
+        );
+    }
+
+    #[test]
+    fn https_connect_refused_is_unreachable() {
+        // Không còn seam 127.0.0.1:1 — https đi thẳng TLS; cổng chết → refused.
         let err = get("https://127.0.0.1:1/x", &[], Duration::from_secs(1)).unwrap_err();
         assert_eq!(err.code(), "NET_UNREACHABLE");
+    }
+
+    /// TLS server 1-kết nối: nhận cert self-signed cho trước, trả `response`.
+    fn spawn_tls_server(
+        cert: rustls::pki_types::CertificateDer<'static>,
+        key: rustls::pki_types::PrivatePkcs8KeyDer<'static>,
+        response: Vec<u8>,
+    ) -> (u16, std::thread::JoinHandle<()>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = std::thread::spawn(move || {
+            let Ok((tcp, _)) = listener.accept() else { return };
+            let cfg = rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(vec![cert], key.into())
+                .unwrap();
+            let conn = rustls::ServerConnection::new(Arc::new(cfg)).unwrap();
+            let mut stream = rustls::StreamOwned::new(conn, tcp);
+            // Đọc tới hết request headers — handshake tự chạy trong read/write.
+            let mut seen = Vec::new();
+            let mut buf = [0u8; 4096];
+            loop {
+                match stream.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        seen.extend_from_slice(&buf[..n]);
+                        if seen.windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    Err(_) => return,
+                }
+            }
+            let _ = stream.write_all(&response);
+            let _ = stream.flush();
+        });
+        (port, handle)
+    }
+
+    fn self_signed_localhost() -> (
+        rustls::pki_types::CertificateDer<'static>,
+        rustls::pki_types::PrivatePkcs8KeyDer<'static>,
+    ) {
+        let certified =
+            rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        (
+            certified.cert.der().clone(),
+            rustls::pki_types::PrivatePkcs8KeyDer::from(certified.signing_key.serialize_der()),
+        )
+    }
+
+    fn tls_response(body: &[u8]) -> Vec<u8> {
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .into_bytes()
+        .into_iter()
+        .chain(body.iter().copied())
+        .collect()
+    }
+
+    #[test]
+    fn https_roundtrip_with_trusted_self_signed_cert() {
+        let (cert, key) = self_signed_localhost();
+        let (port, server) =
+            spawn_tls_server(cert.clone(), key, tls_response(b"hello-tls"));
+
+        // Client tin đúng cert này (inject root) — không dùng native store.
+        let mut roots = RootCertStore::empty();
+        roots.add(cert).unwrap();
+        let config = build_client_config(roots);
+
+        let resp = get_with_config(
+            &format!("https://localhost:{port}/x"),
+            &[],
+            Duration::from_secs(5),
+            config,
+        )
+        .unwrap();
+        assert_eq!(resp.status, 200);
+        assert_eq!(resp.body, b"hello-tls");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn https_rejects_untrusted_certificate() {
+        // Cert self-signed không nằm trong root store → handshake bị từ chối
+        // (validation BẬT mặc định — không có insecure fallback).
+        let (cert, key) = self_signed_localhost();
+        let (port, server) =
+            spawn_tls_server(cert, key, tls_response(b"should-not-see"));
+        let config = build_client_config(RootCertStore::empty());
+
+        let err = get_with_config(
+            &format!("https://localhost:{port}/x"),
+            &[],
+            Duration::from_secs(5),
+            config,
+        )
+        .unwrap_err();
+        assert_eq!(err.code(), "NET_UNREACHABLE");
+        assert!(
+            err.to_string().contains("TLS handshake"),
+            "lỗi phải có ngữ cảnh TLS: {err}"
+        );
+        let _ = server.join();
     }
 
     #[test]

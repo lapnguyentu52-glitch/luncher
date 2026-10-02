@@ -10,7 +10,7 @@ pub mod sha;
 
 pub use download::{download, quick_hashes, DownloadPipelineError, DownloadRequest};
 pub use http::{
-    get, get_stream, https_url_to_http, parse_url, HttpError, HttpOrUserError, HttpResponse,
+    get, get_stream, parse_url, HttpError, HttpOrUserError, HttpResponse,
     StreamHead,
 };
 pub use resume::PartInfo;

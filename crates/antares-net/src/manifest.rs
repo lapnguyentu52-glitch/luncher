@@ -165,13 +165,24 @@ pub fn get_manifest(
     http_timeout: Duration,
     allow_stale: bool,
 ) -> Result<Option<Vec<VersionEntry>>, ManifestError> {
+    get_manifest_from(MOJANG_MANIFEST_URL, cache, http_timeout, allow_stale)
+}
+
+/// `get_manifest` với URL chỉ định — test dùng URL chết để HTTP fail
+/// deterministic (trước đây dựa vào TLS seam đã loại bỏ; F-01).
+pub(crate) fn get_manifest_from(
+    manifest_url: &str,
+    cache: Option<&ManifestCache>,
+    http_timeout: Duration,
+    allow_stale: bool,
+) -> Result<Option<Vec<VersionEntry>>, ManifestError> {
     if let Some(cache) = cache {
         if let Some(hit) = cache.get::<Vec<VersionEntry>>("mojang_manifest", TTL_MANIFEST_SECS, false)
         {
             return Ok(Some(hit));
         }
     }
-    match fetch_manifest(http_timeout) {
+    match fetch_manifest(manifest_url, http_timeout) {
         Ok(versions) => {
             if let Some(cache) = cache {
                 cache.put("mojang_manifest", &versions);
@@ -194,9 +205,9 @@ pub fn get_manifest(
     }
 }
 
-fn fetch_manifest(timeout: Duration) -> Result<Vec<VersionEntry>, ManifestError> {
+fn fetch_manifest(manifest_url: &str, timeout: Duration) -> Result<Vec<VersionEntry>, ManifestError> {
     let response =
-        antares_downloads::get(MOJANG_MANIFEST_URL, &[], timeout).map_err(|err| {
+        antares_downloads::get(manifest_url, &[], timeout).map_err(|err| {
             ManifestError::Http(format!("{} ({})", err, err.code()))
         })?;
     if response.status != 200 {
@@ -373,7 +384,8 @@ mod tests {
 
     #[test]
     fn get_manifest_uses_stale_cache_when_http_fails() {
-        // Cache stale có data + HTTP fail (https seam chết) → trả stale, không error.
+        // Cache stale có data + HTTP fail (URL chết, deterministic — không dựa
+        // mạng ngoài) → trả stale, không error.
         let root = temp_root("offline");
         let cache = ManifestCache::new(&root);
         let path = root.join("manifests/mojang_manifest.json");
@@ -384,11 +396,14 @@ mod tests {
         });
         std::fs::write(&path, payload.to_string()).unwrap();
 
-        let result = get_manifest(Some(&cache), Duration::from_secs(1), true).unwrap();
+        let dead = "https://127.0.0.1:1/manifest";
+        let result =
+            get_manifest_from(dead, Some(&cache), Duration::from_secs(1), true).unwrap();
         assert_eq!(result.unwrap()[0].id, "1.20.1");
 
         // allow_stale=false + HTTP fail → error NET_UNREACHABLE
-        let err = get_manifest(Some(&cache), Duration::from_secs(1), false).unwrap_err();
+        let err = get_manifest_from(dead, Some(&cache), Duration::from_secs(1), false)
+            .unwrap_err();
         assert_eq!(err.code(), "NET_UNREACHABLE");
         let _ = std::fs::remove_dir_all(&root);
     }
