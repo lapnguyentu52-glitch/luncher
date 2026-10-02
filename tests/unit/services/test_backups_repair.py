@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import zipfile
 
+import pytest
+
+from core.errors.base import AntaresError
 from services.backups import BackupService
 from services.repair import RepairService
 
@@ -56,6 +59,37 @@ def test_export_import_zip(ctx, instance_id):
     assert zip_path.is_file() and zip_path.suffix == ".zip"
     assert bk.export_zip(snap["id"]) == zip_path         # idempotent
     assert bk.import_zip(str(zip_path))["id"] == snap["id"]
+
+
+def test_import_zip_bomb_guard(ctx, monkeypatch):
+    """§128 — archive vượt cap uncompressed → reject, không giải nén gì."""
+    import services.backups.service as bk_mod
+
+    bk = BackupService(ctx)
+    snap = bk.create(targets=["config"], label="v1")
+    zip_path = bk.export_zip(snap["id"])
+    monkeypatch.setattr(bk_mod, "_MAX_IMPORT_BYTES", 5)
+    with pytest.raises(AntaresError):
+        bk.import_zip(str(zip_path))
+    assert (bk._backups / snap["id"] / "metadata.json").is_file()
+
+
+def test_import_keeps_existing_snapshot_if_extract_fails(ctx, monkeypatch):
+    """§4.4 — extract fail giữa chừng → snapshot cũ cùng id không bị mất
+    (code cũ rmtree TRƯỚC extractall)."""
+    bk = BackupService(ctx)
+    snap = bk.create(targets=["config"], label="v1")
+    zip_path = bk.export_zip(snap["id"])
+
+    def boom(self, path):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(zipfile.ZipFile, "extractall", boom)
+    with pytest.raises(OSError):
+        bk.import_zip(str(zip_path))
+    assert (bk._backups / snap["id"] / "metadata.json").is_file()
+    # không còn thư mục tạm .importing-* sót
+    assert not [p for p in bk._backups.glob(".importing-*")]
 
 
 def test_backup_validation(ctx):

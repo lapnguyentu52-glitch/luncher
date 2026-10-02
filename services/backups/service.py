@@ -27,6 +27,11 @@ from core.logging.setup import get_logger
 
 logger = get_logger("backups")
 
+#: Giới hạn import ZIP (§128 — zip bomb guard).
+_MAX_IMPORT_ENTRIES = 20_000
+_MAX_IMPORT_BYTES = 4 * 1024 * 1024 * 1024   # 4 GB uncompressed
+_MAX_IMPORT_RATIO = 200                        # tỉ lệ nén tối đa cho phép
+
 #: Target hợp lệ (mục 22).
 TARGETS = ("instance", "config", "mods", "resourcepacks", "saves")
 
@@ -264,13 +269,35 @@ class BackupService:
             if "metadata.json" not in names:
                 raise AntaresError(codes.VALIDATION_FAILED,
                                    "Not an Antares snapshot (metadata.json missing)")
+            # §128 — zip bomb guard: giới hạn số entry, tổng dung lượng đã nén
+            # và tỉ lệ nén trước khi giải nén bất cứ thứ gì.
+            infos = zf.infolist()
+            if len(infos) > _MAX_IMPORT_ENTRIES:
+                raise AntaresError(codes.VALIDATION_FAILED,
+                                   f"Too many entries in archive ({len(infos)})")
+            total_uncompressed = sum(i.file_size for i in infos)
+            if total_uncompressed > _MAX_IMPORT_BYTES:
+                raise AntaresError(codes.VALIDATION_FAILED,
+                                   f"Archive too large ({total_uncompressed} bytes uncompressed)")
+            if src.stat().st_size > 0 and total_uncompressed > (
+                    _MAX_IMPORT_RATIO * src.stat().st_size):
+                raise AntaresError(codes.VALIDATION_FAILED,
+                                   "Suspicious compression ratio (zip bomb guard)")
             import json
             meta = json.loads(zf.read("metadata.json").decode("utf-8"))
             snap_id = str(meta.get("id") or f"imported-{uuid.uuid4().hex[:6]}")
             if any(c in snap_id for c in "/\\..:"):
                 raise AntaresError(codes.VALIDATION_FAILED, "Invalid snapshot id in archive")
             dest = self._backups / snap_id
-            if dest.exists():
-                shutil.rmtree(dest)
-            zf.extractall(dest)
+            # §4.4 — extract vào thư mục tạm TRƯỚC; chỉ thay snapshot cũ khi
+            # extract thành công (extract fail giữa chừng không mất snapshot cũ).
+            tmp = self._backups / f".importing-{uuid.uuid4().hex[:8]}"
+            try:
+                zf.extractall(tmp)
+                if dest.exists():
+                    shutil.rmtree(dest)
+                tmp.replace(dest)
+            finally:
+                if tmp.exists():
+                    shutil.rmtree(tmp, ignore_errors=True)
         return self._metadata(snap_id)
