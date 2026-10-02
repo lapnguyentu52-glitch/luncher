@@ -58,6 +58,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build frontend (frontendDist cho generate_context!)
         run: pnpm --filter @antares/desktop build
+      # externalBin (tauri.conf.json) phải tồn tại cho build.rs dù chỉ cargo
+      # check; bản binary thật do windows-build.yml build bằng PyInstaller.
+      - name: Stub legacy sidecar (resource check)
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          touch src-tauri/binaries/antares-legacy-x86_64-pc-windows-msvc.exe
       - name: Check Tauri shell
         run: cargo check -p antares-desktop
 

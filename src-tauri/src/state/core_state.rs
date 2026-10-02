@@ -38,13 +38,26 @@ impl CoreState {
         }
         log::info!("storage root: {:?}", root);
 
-        // §234 — legacy sidecar program: env override cho dev, sau bundle là externalBin.
+        // §234 — legacy sidecar program: env override cho dev (vd:
+        // "python3 legacy/python/sidecar.py"), sau bundle là externalBin.
         let bridge = LegacyBridge::new();
-        if let Ok(program) = std::env::var("ANTARES_LEGACY_SIDECAR") {
-            log::info!("legacy sidecar configured: {program}");
-            bridge.set_program(program);
-        } else {
-            log::info!("legacy sidecar not configured (ANTARES_LEGACY_SIDECAR unset)");
+        let program = std::env::var("ANTARES_LEGACY_SIDECAR").ok().or_else(|| {
+            // externalBin: cạnh exe — NSIS strip hậu tố triple khi cài
+            // (antares-legacy.exe), portable giữ triple (antares-legacy-<triple>.exe).
+            let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+            sidecar_candidates().iter().find_map(|name| {
+                let p = exe_dir.join(name);
+                p.exists().then(|| p.to_string_lossy().into_owned())
+            })
+        });
+        match program {
+            Some(program) => {
+                log::info!("legacy sidecar configured: {program}");
+                bridge.set_program(program);
+            }
+            None => {
+                log::info!("legacy sidecar not configured (ANTARES_LEGACY_SIDECAR unset, none next to exe)");
+            }
         }
         // Mục 5.1 — truyền data dir cho sidecar để Rust/Python thấy cùng dữ liệu.
         // ANTARES_ROOT = cạnh exe để portable.flag khớp §218.
@@ -65,9 +78,35 @@ impl CoreState {
     }
 }
 
+/// Tên sidecar cạnh exe: tên trần (NSIS đã strip triple) trước, rồi các triple phổ biến
+/// (bản portable giữ hậu tố triple từ externalBin).
+fn sidecar_candidates() -> Vec<String> {
+    let mut names = vec!["antares-legacy.exe".to_string(), "antares-legacy".to_string()];
+    #[cfg(windows)]
+    names.extend(
+        ["x86_64", "i686", "aarch64"]
+            .iter()
+            .map(|arch| format!("antares-legacy-{arch}-pc-windows-msvc.exe")),
+    );
+    #[cfg(all(unix, not(target_os = "macos")))]
+    names.extend(
+        ["x86_64", "aarch64"]
+            .iter()
+            .map(|arch| format!("antares-legacy-{arch}-unknown-linux-gnu")),
+    );
+    #[cfg(target_os = "macos")]
+    names.extend(
+        ["x86_64", "aarch64"]
+            .iter()
+            .map(|arch| format!("antares-legacy-{arch}-apple-darwin")),
+    );
+    names
+}
+
 /// Data dir theo platform mà không thêm dependency: %APPDATA% (win), XDG_DATA_HOME (linux),
 /// ~/Library/Application Support (mac).
 fn dirs_data_root() -> Option<PathBuf> {
+    #[allow(unused_variables)]
     #[cfg(target_os = "windows")]
     {
         std::env::var("APPDATA").ok().map(PathBuf::from)
@@ -84,5 +123,21 @@ fn dirs_data_root() -> Option<PathBuf> {
             .ok()
             .map(PathBuf::from)
             .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sidecar_candidates_prefers_plain_name_then_triple() {
+        let names = sidecar_candidates();
+        assert_eq!(names[0], "antares-legacy.exe");
+        assert_eq!(names[1], "antares-legacy");
+        assert!(
+            names.iter().any(|n| n.starts_with("antares-legacy-")),
+            "cần biến thể triple cho portable bundle: {names:?}"
+        );
     }
 }

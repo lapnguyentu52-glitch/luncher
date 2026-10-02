@@ -40,12 +40,45 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install deps
         run: pnpm install --frozen-lockfile
+
+      # externalBin (tauri.conf.json) yêu cầu file có hậu tố target triple;
+      # NSIS bundler tự strip triple khi cài → tên trần antares-legacy.exe.
+      - name: Build legacy sidecar (PyInstaller)
+        shell: bash
+        run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --onefile \
+            --name antares-legacy-x86_64-pc-windows-msvc \
+            --paths . \
+            --distpath src-tauri/binaries \
+            --exclude-module webview --exclude-module pytest --exclude-module tkinter \
+            legacy/python/sidecar.py
 
       # beforeBuildCommand trong tauri.conf.json tự build frontend (vue-tsc + vite)
       - name: Build (exe + NSIS installer)
         run: pnpm tauri build
+
+      # Portable = exe thô + sidecar cạnh nhau (resolve trong core_state.rs).
+      - name: Package portable (exe + sidecar)
+        shell: bash
+        run: |
+          mkdir -p portable
+          cp target/release/antares-desktop.exe portable/
+          cp src-tauri/binaries/antares-legacy-x86_64-pc-windows-msvc.exe portable/
+          7z a antares-portable-win64.zip ./portable/*
+
+      - name: Upload portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: antares-windows-portable
+          path: antares-portable-win64.zip
+          if-no-files-found: error
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -53,10 +86,3 @@ jobs:
           name: antares-windows-installer
           path: target/release/bundle/nsis/*.exe
           if-no-files-found: error
-
-      - name: Upload portable exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: antares-windows-portable
-          path: target/release/antares-desktop.exe
-          if-no-files-found: warn

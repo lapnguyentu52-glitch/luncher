@@ -15,6 +15,8 @@ coverage/
 # Build artifacts
 dist/
 build/
+# sidecar đóng gói bằng PyInstaller (CI sinh ra, không commit)
+src-tauri/binaries/
 out/
 
 # Tauri / Rust
