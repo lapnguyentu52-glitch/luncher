@@ -13,6 +13,15 @@ Ngày:       2026-09-27
 
 Không được phá baseline này trong toàn bộ quá trình migration (§87.1, §190).
 
+Cập nhật 2026-10-02 (không thay baseline lịch sử ở trên):
+
+```text
+python -m pytest tests -q   → 484 passed   (481 cũ + 3 test spawn sidecar thật)
+cargo test --workspace      → 347+ passed  (15 crate, trừ antares-shell)
+pnpm test                   → 129 passed   (17 file)
+pnpm typecheck / pnpm lint  → 0 lỗi
+```
+
 ## Audit số liệu (từ remake.md §87.1)
 
 ```text

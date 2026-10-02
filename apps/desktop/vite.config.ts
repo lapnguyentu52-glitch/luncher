@@ -13,7 +13,11 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // Release policy (audit A-03): không đóng gói source map — giảm dung
+    // lượng dist và không lộ implementation. Dev server vẫn map trực tiếp từ source.
+    sourcemap: false,
+    // chunk `three` ~746kB là lazy feature chunk — đừng cảnh báo nhiễu.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         // §153: không tạo giant bundle — tách shell khỏi các feature chunk lazy

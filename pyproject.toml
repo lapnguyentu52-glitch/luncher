@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antares-launcher"
-version = "3.0.0"
-description = "Antares Launcher - game-first Minecraft launcher (Spark capability, service architecture)"
+version = "4.0.0"
+description = "Antares Launcher - game-first Minecraft launcher (Tauri 4.0, service architecture)"
 requires-python = ">=3.11"
 dependencies = [
     "minecraft-launcher-lib>=8.0",

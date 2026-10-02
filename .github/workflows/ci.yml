@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # codespace-… là nhánh mặc định của repo — thiếu là CI không chạy khi push.
+    branches: [main, master, codespace-cautious-dollop-wvw4x59pg76h5qq9]
   pull_request:
   workflow_dispatch:
 
@@ -87,7 +88,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
 
-  # Python legacy sidecar (baseline tests — 254 phải luôn xanh)
+  # Python legacy sidecar (baseline tests — 484 phải luôn xanh; xem docs/migration/BASELINE.md)
   python:
     name: Python legacy (baseline)
     runs-on: ubuntu-latest

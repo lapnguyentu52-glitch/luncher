@@ -1,4 +1,7 @@
 packages:
   - apps/*
+# pnpm v11+ chỉ đọc settings ở đây (không còn package.json "pnpm" field).
+# esbuild + vue-demi cần build script để chạy.
 allowBuilds:
   esbuild: true
+  vue-demi: true
