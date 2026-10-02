@@ -130,8 +130,8 @@ class AntaresApi:
         """Báo cho UI biết state vừa đổi (không làm hỏng command nếu lỗi)."""
         try:
             self._ctx.events.publish(name, payload or {}, **kw)
-        except Exception:
-            pass
+        except Exception as err:  # noqa: BLE001 — publish không được phá command
+            logger.warning("event publish failed (%s): %s", name, err)
 
     def _wire_services(self) -> None:
         ctx = self._ctx
@@ -233,16 +233,16 @@ class AntaresApi:
         def on_task_update(task) -> None:
             try:
                 ctx.events.publish(ev.TASK_UPDATED, task.to_dict(), task_id=task.id)
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001 — listener không được ném ra TaskManager
+                logger.warning("task update event failed: %s", err)
         ctx.tasks.set_update_listener(on_task_update)
 
         # Java discovery nâng cao chạy nền — không block startup (mục 39)
         def warm_java():
             try:
                 ctx.set("java_homes", scan_system_java())
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001 — scan nền fail không được giết startup
+                logger.warning("warm java discovery failed: %s", err)
         import threading
         threading.Thread(target=warm_java, daemon=True).start()
 
