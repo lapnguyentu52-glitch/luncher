@@ -50,32 +50,67 @@ impl HttpError {
 }
 
 /// URL prefix scheme — host, port, path/query.
+///
+/// F-09: scheme case-insensitive; IPv6 literal `[::1]:8080` → host `::1`;
+/// query-only `http://host?x=1` → path `/?x=1`; fragment `#...` cắt bỏ
+/// (client-side, không gửi lên server — RFC 3986).
 pub fn parse_url(url: &str) -> Result<(String, u16, String), HttpError> {
     let (scheme, rest) = url
         .split_once("://")
         .ok_or_else(|| HttpError::InvalidUrl(url.to_string()))?;
-    match scheme {
+    let scheme = scheme.to_ascii_lowercase();
+    match scheme.as_str() {
         "http" | "https" => {}
         other => return Err(HttpError::UnsupportedScheme(other.to_string())),
     }
-    let (authority, path) = match rest.find('/') {
-        Some(idx) => (&rest[..idx], &rest[idx..]),
-        None => (rest, "/"),
+    let rest = match rest.split_once('#') {
+        Some((before, _)) => before,
+        None => rest,
     };
-    let (host, port) = match authority.rsplit_once(':') {
-        Some((h, p)) => (
-            h.to_string(),
-            p.parse::<u16>()
-                .map_err(|_| HttpError::InvalidUrl(url.to_string()))?,
-        ),
+    // Authority kết thúc ở '/' hoặc '?' — query-only URL không có slash.
+    let (authority, path) = match rest.find(['/', '?']) {
+        Some(idx) => {
+            let (auth, tail) = rest.split_at(idx);
+            if tail.starts_with('?') {
+                (auth.to_string(), format!("/{tail}"))
+            } else {
+                (auth.to_string(), tail.to_string())
+            }
+        }
+        None => (rest.to_string(), "/".to_string()),
+    };
+    let (host, port_str) = if let Some(inner) = authority.strip_prefix('[') {
+        // IPv6 literal: [::1] hoặc [::1]:8080 — brackets tách khỏi port.
+        let (ipv6, tail) = inner
+            .split_once(']')
+            .ok_or_else(|| HttpError::InvalidUrl(url.to_string()))?;
+        let port = match tail {
+            "" => None,
+            other => Some(
+                other
+                    .strip_prefix(':')
+                    .ok_or_else(|| HttpError::InvalidUrl(url.to_string()))?,
+            ),
+        };
+        (ipv6.to_string(), port)
+    } else {
+        match authority.rsplit_once(':') {
+            Some((h, p)) => (h.to_string(), Some(p)),
+            None => (authority.clone(), None),
+        }
+    };
+    let port = match port_str {
+        Some(p) => p
+            .parse::<u16>()
+            .map_err(|_| HttpError::InvalidUrl(url.to_string()))?,
         // Default port theo scheme: https không port → 443 (không phải 80).
-        None if scheme == "https" => (authority.to_string(), 443),
-        None => (authority.to_string(), 80),
+        None if scheme == "https" => 443,
+        None => 80,
     };
     if host.is_empty() {
         return Err(HttpError::InvalidUrl(url.to_string()));
     }
-    Ok((host, port, path.to_string()))
+    Ok((host, port, path))
 }
 
 /// Transport: plain TCP hoặc TLS (rustls) — Read/Write uniform với engine.
@@ -198,7 +233,7 @@ fn get_with_config(
     config: Arc<ClientConfig>,
 ) -> Result<HttpResponse, HttpError> {
     let (head, body) = get_following_redirects(url, extra_headers, timeout, config, |reader, head| {
-        read_full_body(reader, head)
+        read_full_body(reader, head, MAX_BODY_BYTES)
     })
     .map_err(|err| match err {
         FollowError::Http(err) => err,
@@ -389,17 +424,19 @@ fn is_chunked(head: &StreamHead) -> bool {
         .any(|(k, v)| k == "transfer-encoding" && v.to_lowercase().contains("chunked"))
 }
 
-/// Buffer toàn bộ body (get) — cap MAX_BODY_BYTES.
+/// Buffer toàn bộ body (get) — cap `max_bytes`.
+/// F-10: MỌI nhánh trả hard error khi vượt cap — KHÔNG BAO GIỜ trả body truncate.
 fn read_full_body(
     reader: &mut BufReader<Connection>,
     head: &StreamHead,
+    max_bytes: u64,
 ) -> Result<Vec<u8>, FollowError<core::convert::Infallible>> {
     let body = if is_chunked(head) {
-        read_chunked(reader)
+        read_chunked(reader, max_bytes)
     } else if let Some(len) = body_len(head) {
-        if len > MAX_BODY_BYTES {
+        if len > max_bytes {
             return Err(FollowError::Http(HttpError::InvalidResponse(format!(
-                "body {len} quá lớn"
+                "body {len} quá lớn (cap {max_bytes})"
             ))));
         }
         let mut body = vec![0u8; len as usize];
@@ -408,12 +445,18 @@ fn read_full_body(
             .map_err(|err| FollowError::Http(HttpError::Io(err.to_string())))?;
         Ok(body)
     } else {
-        // Không length, không chunked → đọc tới khi đóng (Connection: close)
+        // Không length, không chunked → đọc tới khi đóng (Connection: close).
+        // Đọc cap+1 byte: vừa vượt cap là error — không truncate thành success.
         let mut body = Vec::new();
         reader
-            .take(MAX_BODY_BYTES)
+            .take(max_bytes + 1)
             .read_to_end(&mut body)
             .map_err(|err| FollowError::Http(HttpError::Io(err.to_string())))?;
+        if body.len() as u64 > max_bytes {
+            return Err(FollowError::Http(HttpError::InvalidResponse(format!(
+                "body vượt cap {max_bytes} bytes"
+            ))));
+        }
         Ok(body)
     };
     body.map_err(FollowError::Http)
@@ -483,7 +526,10 @@ fn stream_body<E>(
 }
 
 /// Đọc chunked body buffer-mode: `size hex\r\n<size bytes>\r\n` … `0\r\n\r\n`.
-fn read_chunked(reader: &mut BufReader<Connection>) -> Result<Vec<u8>, HttpError> {
+fn read_chunked(
+    reader: &mut BufReader<Connection>,
+    max_bytes: u64,
+) -> Result<Vec<u8>, HttpError> {
     let mut body = Vec::new();
     loop {
         let mut size_line = String::new();
@@ -499,7 +545,7 @@ fn read_chunked(reader: &mut BufReader<Connection>) -> Result<Vec<u8>, HttpError
             let _ = reader.read_line(&mut crlf);
             return Ok(body);
         }
-        if body.len() as u64 + size as u64 > MAX_BODY_BYTES {
+        if body.len() as u64 + size as u64 > max_bytes {
             return Err(HttpError::InvalidResponse("chunked body quá lớn".into()));
         }
         let mut chunk = vec![0u8; size];
@@ -598,6 +644,128 @@ mod tests {
             parse_url("https://example.com:8443/x").unwrap(),
             ("example.com".into(), 8443, "/x".into())
         );
+    }
+
+    #[test]
+    fn parse_url_ipv6_literal_authority() {
+        // F-09 — brackets tách khỏi port, host trả bare IPv6 cho connect/ServerName.
+        assert_eq!(
+            parse_url("http://[::1]:8080/x").unwrap(),
+            ("::1".into(), 8080, "/x".into())
+        );
+        assert_eq!(
+            parse_url("http://[::1]/x").unwrap(),
+            ("::1".into(), 80, "/x".into())
+        );
+        assert_eq!(
+            parse_url("https://[2001:db8::1]").unwrap(),
+            ("2001:db8::1".into(), 443, "/".into())
+        );
+        // Thiếu ']' → invalid, không hiểu nhầm ':' thành port
+        assert!(matches!(
+            parse_url("http://[::1/x").unwrap_err(),
+            HttpError::InvalidUrl(_)
+        ));
+    }
+
+    #[test]
+    fn parse_url_query_only_fragment_and_scheme_case() {
+        // F-09 — query-only không có '/' trước '?' → path '/?...'
+        assert_eq!(
+            parse_url("http://host?x=1").unwrap(),
+            ("host".into(), 80, "/?x=1".into())
+        );
+        assert_eq!(
+            parse_url("http://host/p?a=1&b=2").unwrap(),
+            ("host".into(), 80, "/p?a=1&b=2".into())
+        );
+        // Fragment không gửi lên server
+        assert_eq!(
+            parse_url("http://host/x#frag").unwrap(),
+            ("host".into(), 80, "/x".into())
+        );
+        // Scheme case-insensitive (RFC 3986)
+        assert_eq!(
+            parse_url("HTTP://example.com/x").unwrap(),
+            ("example.com".into(), 80, "/x".into())
+        );
+    }
+
+    /// Tạo pair socket (client, server-thread ghi `payload` rồi đóng).
+    fn socket_pair(payload: Vec<u8>) -> (TcpStream, std::thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            let Ok((mut s, _)) = listener.accept() else { return };
+            let _ = s.write_all(&payload);
+        });
+        let client = TcpStream::connect(addr).unwrap();
+        (client, handle)
+    }
+
+    #[test]
+    fn till_close_body_under_cap_is_ok() {
+        let (tcp, handle) = socket_pair(vec![b'x'; 512]);
+        let mut reader = BufReader::new(Connection::Plain(tcp));
+        let head = StreamHead { status: 200, headers: vec![] }; // till-close
+        let body = match read_full_body(&mut reader, &head, 1024) {
+            Ok(body) => body,
+            Err(FollowError::Http(e)) => panic!("unexpected error: {e}"),
+            Err(FollowError::User(e)) => match e {},
+        };
+        assert_eq!(body.len(), 512);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn till_close_body_over_cap_hard_errors_not_truncation() {
+        // F-10 — bản cũ take(cap).read_to_end → 4096-byte body truncate thành
+        // "thành công" 1024 byte. Giờ phải hard error.
+        let (tcp, handle) = socket_pair(vec![b'x'; 4096]);
+        let mut reader = BufReader::new(Connection::Plain(tcp));
+        let head = StreamHead { status: 200, headers: vec![] };
+        let err = read_full_body(&mut reader, &head, 1024).unwrap_err();
+        match err {
+            FollowError::Http(e) => assert!(e.to_string().contains("cap"), "{e}"),
+            FollowError::User(e) => match e {},
+        }
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn content_length_over_cap_is_error() {
+        // Content-length vượt cap → reject TRƯỚC khi đọc (socket không cần data).
+        let (tcp, handle) = socket_pair(Vec::new());
+        let mut reader = BufReader::new(Connection::Plain(tcp));
+        let head = StreamHead {
+            status: 200,
+            headers: vec![("content-length".into(), "100".into())],
+        };
+        let err = read_full_body(&mut reader, &head, 10).unwrap_err();
+        assert!(matches!(err, FollowError::Http(HttpError::InvalidResponse(_))));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn chunked_body_over_cap_is_error() {
+        // 2 chunks × 600B với cap 1000 → vượt tổng → error (không assemble đủ).
+        let chunked = b"258\r\n".to_vec()
+            .into_iter()
+            .chain(std::iter::repeat(b'x').take(600))
+            .chain(b"\r\n".to_vec())
+            .chain(b"258\r\n".to_vec())
+            .chain(std::iter::repeat(b'x').take(600))
+            .chain(b"\r\n0\r\n\r\n".to_vec())
+            .collect();
+        let (tcp, handle) = socket_pair(chunked);
+        let mut reader = BufReader::new(Connection::Plain(tcp));
+        let head = StreamHead {
+            status: 200,
+            headers: vec![("transfer-encoding".into(), "chunked".into())],
+        };
+        let err = read_full_body(&mut reader, &head, 1000).unwrap_err();
+        assert!(matches!(err, FollowError::Http(HttpError::InvalidResponse(_))));
+        handle.join().unwrap();
     }
 
     #[test]
