@@ -13,7 +13,11 @@ Xem `remake.md` cho master plan và `docs/migration/` cho trạng thái migratio
 apps/desktop/      Vue 3 + TypeScript + Vite (UI mới)
 src-tauri/         Tauri 2 shell (Rust)
 crates/            Rust core workspace (storage, core, bridge, downloads, process,
-                   java, launch, net, profiles — 9 crates)
+                   java, launch, net, profiles, system, diagnostics, optimization,
+                   mods, resources, visuals — 15 crates)
+                   ⚠ Chỉ core/storage/bridge được link vào src-tauri shell hiện tại;
+                   12 crate còn lại là migration substrate (unit test xanh, chưa
+                   gọi từ app) — xem mục \"Tích hợp crate\" dưới đây.
 legacy/python/     Legacy sidecar bridge (JSON Lines stdio)
 companion/         Fabric companion mod (Minecraft runtime data)
 api/ core/ infrastructure/ services/        Python legacy (giữ nguyên trong migration)
@@ -35,8 +39,20 @@ pnpm --filter @antares/desktop build
 ## Python legacy (baseline)
 
 ```bash
-python -m pytest tests -q    # 254 passed — không được phá trong migration
+python -m pytest tests -q    # 495 passed (2026-10-02; baseline lịch sử 254 — không được phá)
 ```
+
+## Tích hợp crate (trạng thái trung thực)
+
+`src-tauri` hiện chỉ phụ thuộc `antares-core`, `antares-storage`, `antares-bridge`
+(chỉ3/15 crate). 12 crate còn lại (`downloads`, `process`, `java`, `launch`, `net`,
+`profiles`, `system`, `diagnostics`, `optimization`, `mods`, `resources`, `visuals`)
+**chưa được nối vào Tauri command surface** — code + test chạy nhưng chưa phải runtime
+của app; các flow UI vẫn đi qua `legacy_call` → sidecar Python.
+
+Lộ trình: tạo crate composition root (`antares-app`) rồi nối từng nhóm command theo
+kế hoạch Batch 04–13 trong kế hoạch no-Python (docs/architecture), sau đó mới gỡ
+`legacy_*` (Batch 14) và xoá Python (Batch 15).
 
 ## Milestone hiện tại
 
@@ -69,7 +85,8 @@ python -m pytest tests -q    # 254 passed — không được phá trong migrati
   `antares-profiles` (GAME_KEYS/coerce parity, diff §107; phase 2: write_options_merged
   parity; phase 4: ProfileStore CRUD qua antares-storage + sanitize/validate spec,
   crate được thêm vào workspace members) — kèm unit tests + parity checklist
-  `docs/migration/PARITY.md` + CI job `cargo test --workspace` (3 OS, exclude Tauri shell)
+  `docs/migration/PARITY.md` + CI job `cargo test --workspace` (2 OS: Ubuntu +
+  Windows, exclude Tauri shell)
 - [x] Batch 6 Profiles · 7a Mods · 7b Modpack/Detail · 8a Asset Library · 8b Resource
   Studio · 9 Visual Studio (+ Three.js totem) · 10 Optimization · 11 Network Lab ·
   12 Runtime/Packet · 13 Diagnostics — qua legacy bridge (chi tiết trong BASELINE.md)
