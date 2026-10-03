@@ -9,6 +9,9 @@ use antares_core::AppState;
 /// trong crate), nên chỉ cần giữ Arc — không wrap thêm Mutex.
 pub struct CoreState {
     pub app: Arc<AppState>,
+    /// F-14 Batch 04 — composition root: command đi qua AppServices, không
+    /// tự new service trong handler.
+    services: Arc<antares_app::AppServices>,
     legacy_bridge: Arc<LegacyBridge>,
 }
 
@@ -66,8 +69,11 @@ impl CoreState {
             bridge.set_env("ANTARES_ROOT", exe_dir.to_string_lossy().into_owned());
         }
 
+        let services = Arc::new(antares_app::AppServices::new(root.clone()));
+
         Self {
             app: Arc::new(AppState::new(root)),
+            services,
             legacy_bridge: bridge,
         }
     }
@@ -75,6 +81,11 @@ impl CoreState {
     /// Accessor legacy bridge — trả Arc để clone vào thread/blocking task.
     pub fn legacy(&self) -> Arc<LegacyBridge> {
         Arc::clone(&self.legacy_bridge)
+    }
+
+    /// Composition root (F-14) — trả Arc để command clone vào thread/blocking.
+    pub fn services(&self) -> Arc<antares_app::AppServices> {
+        Arc::clone(&self.services)
     }
 }
 

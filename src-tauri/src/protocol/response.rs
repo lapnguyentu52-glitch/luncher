@@ -30,6 +30,15 @@ impl<T> AntaresResponse<T> {
             warnings: Vec::new(),
         }
     }
+
+    /// Typed service result (§117 `AppError`) → envelope §96 — command map
+    /// request → service → response trong 1 dòng, không hardcode code ở handler.
+    pub fn from_result(result: Result<T, antares_app::AppError>) -> Self {
+        match result {
+            Ok(data) => Self::ok(data),
+            Err(err) => Self::err(err.into()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -51,5 +60,23 @@ mod tests {
         let json = serde_json::to_string(&res).expect("serialize");
         assert!(json.contains("\"ok\":false"));
         assert!(json.contains("INSTANCE_LOCKED"));
+    }
+
+    #[test]
+    fn from_result_maps_typed_service_result() {
+        use antares_app::{codes, AppError};
+
+        let ok: AntaresResponse<u32> = AntaresResponse::from_result(Ok(7));
+        assert!(ok.ok);
+        assert_eq!(ok.data, Some(7));
+
+        let err: AntaresResponse<u32> = AntaresResponse::from_result(Err(AppError::new(
+            codes::STORAGE_WRITE_FAILED,
+            "disk full",
+        )));
+        assert!(!err.ok);
+        let error = err.error.expect("error");
+        assert_eq!(error.code, "STORAGE_WRITE_FAILED");
+        assert!(error.retryable);
     }
 }

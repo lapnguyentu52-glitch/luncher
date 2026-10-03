@@ -10,6 +10,16 @@ pub enum ScopedRoot {
 }
 
 impl ScopedRoot {
+    /// Mọi scope — dùng cho init/report (composition root không phải liệt kê tay).
+    pub const ALL: &'static [ScopedRoot] = &[
+        ScopedRoot::AppData,
+        ScopedRoot::Cache,
+        ScopedRoot::Logs,
+        ScopedRoot::Profiles,
+        ScopedRoot::Instances,
+        ScopedRoot::Backups,
+    ];
+
     pub fn dir_name(self) -> &'static str {
         match self {
             ScopedRoot::AppData => "app-data",

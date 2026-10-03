@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "src-tauri",
+    "crates/antares-app",
     "crates/antares-storage",
     "crates/antares-core",
     "crates/antares-bridge",

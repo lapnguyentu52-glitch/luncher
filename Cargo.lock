@@ -42,6 +42,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "antares-app"
+version = "4.0.0"
+dependencies = [
+ "antares-process",
+ "antares-storage",
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "antares-bridge"
 version = "4.0.0"
 dependencies = [
@@ -68,6 +80,7 @@ dependencies = [
 name = "antares-desktop"
 version = "4.0.0"
 dependencies = [
+ "antares-app",
  "antares-bridge",
  "antares-core",
  "log",

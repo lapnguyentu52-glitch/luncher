@@ -5,6 +5,17 @@ use crate::protocol::response::AntaresResponse;
 use crate::state::core_state::CoreState;
 use crate::state::storage_mode::StorageMode;
 
+/// F-14 Batch 04 — command đầu tiên đi qua composition root (`AppServices`):
+/// tạo scoped root còn thiếu + báo cáo (§98). Lỗi typed §117 (vd root không
+/// ghi được → STORAGE_WRITE_FAILED) tự map vào envelope §96, handler không
+/// tự dựng service hay hardcode code.
+#[tauri::command]
+pub fn app_storage_info(
+    state: tauri::State<'_, CoreState>,
+) -> AntaresResponse<antares_app::StorageReport> {
+    AntaresResponse::from_result(state.services().ensure_storage())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PingPayload {

@@ -1,5 +1,5 @@
 import { invokeCommand, requestCommand } from './ipc'
-import type { PingPayload, TestEventPayload, VersionPayload } from '@/types/commands'
+import type { PingPayload, StorageInfoPayload, TestEventPayload, VersionPayload } from '@/types/commands'
 import type { StorageMode } from '@/types/app'
 
 export async function ping(): Promise<PingPayload> {
@@ -12,6 +12,11 @@ export async function getVersion(): Promise<VersionPayload> {
 
 export async function getStorageMode(): Promise<StorageMode> {
   return invokeCommand('app_storage_mode')
+}
+
+/** F-14 — qua composition root (AppServices): tạo scoped root thiếu + báo cáo. */
+export async function getStorageInfo(): Promise<StorageInfoPayload> {
+  return invokeCommand('app_storage_info')
 }
 
 /** Biến thể request (không throw) cho chỗ UI muốn hiện error inline. */

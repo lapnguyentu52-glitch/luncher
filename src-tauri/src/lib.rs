@@ -30,6 +30,7 @@ pub fn run() {
             commands::app_ping,
             commands::app_version,
             commands::app_storage_mode,
+            commands::app_storage_info,
             commands::app_test_event,
             commands::core_status,
             commands::core_spawn_task,

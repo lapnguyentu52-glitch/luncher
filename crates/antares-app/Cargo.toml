@@ -1,0 +1,16 @@
+[package]
+name = "antares-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "F-14/M3 — native service composition root cho Tauri command surface"
+
+[dependencies]
+antares-process = { path = "../antares-process" }
+antares-storage = { path = "../antares-storage" }
+serde.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

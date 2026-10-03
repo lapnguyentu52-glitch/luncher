@@ -36,7 +36,7 @@ pub async fn legacy_start(app: tauri::AppHandle) -> AntaresResponse<VersionInfo>
     let legacy = app.state::<CoreState>().legacy();
     match tauri::async_runtime::spawn_blocking(move || legacy.start()).await {
         Ok(result) => result_to_response(result),
-        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+        Err(err) => AntaresResponse::err(AntaresError::internal(err.to_string())),
     }
 }
 
@@ -113,7 +113,7 @@ pub async fn legacy_call(
     .await
     {
         Ok(result) => result_to_response(result),
-        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+        Err(err) => AntaresResponse::err(AntaresError::internal(err.to_string())),
     }
 }
 
@@ -122,7 +122,7 @@ pub async fn legacy_restart(app: tauri::AppHandle) -> AntaresResponse<VersionInf
     let legacy = app.state::<CoreState>().legacy();
     match tauri::async_runtime::spawn_blocking(move || legacy.restart()).await {
         Ok(result) => result_to_response(result),
-        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+        Err(err) => AntaresResponse::err(AntaresError::internal(err.to_string())),
     }
 }
 
@@ -137,7 +137,7 @@ pub async fn legacy_shutdown(app: tauri::AppHandle) -> AntaresResponse<serde_jso
     .await
     {
         Ok(result) => result_to_response(result),
-        Err(err) => AntaresResponse::err(AntaresError::new("APP_INTERNAL", err.to_string(), true)),
+        Err(err) => AntaresResponse::err(AntaresError::internal(err.to_string())),
     }
 }
 

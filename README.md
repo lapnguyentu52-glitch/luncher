@@ -12,10 +12,10 @@ Xem `remake.md` cho master plan và `docs/migration/` cho trạng thái migratio
 ```text
 apps/desktop/      Vue 3 + TypeScript + Vite (UI mới)
 src-tauri/         Tauri 2 shell (Rust)
-crates/            Rust core workspace (storage, core, bridge, downloads, process,
+crates/            Rust core workspace (app, storage, core, bridge, downloads, process,
                    java, launch, net, profiles, system, diagnostics, optimization,
-                   mods, resources, visuals — 15 crates)
-                   ⚠ Chỉ core/storage/bridge được link vào src-tauri shell hiện tại;
+                   mods, resources, visuals — 16 crates)
+                   ⚠ Chỉ app/core/storage/bridge được link vào src-tauri shell hiện tại;
                    12 crate còn lại là migration substrate (unit test xanh, chưa
                    gọi từ app) — xem mục \"Tích hợp crate\" dưới đây.
 legacy/python/     Legacy sidecar bridge (JSON Lines stdio)
@@ -44,15 +44,16 @@ python -m pytest tests -q    # 495 passed (2026-10-02; baseline lịch sử 254 
 
 ## Tích hợp crate (trạng thái trung thực)
 
-`src-tauri` hiện chỉ phụ thuộc `antares-core`, `antares-storage`, `antares-bridge`
-(chỉ3/15 crate). 12 crate còn lại (`downloads`, `process`, `java`, `launch`, `net`,
-`profiles`, `system`, `diagnostics`, `optimization`, `mods`, `resources`, `visuals`)
-**chưa được nối vào Tauri command surface** — code + test chạy nhưng chưa phải runtime
-của app; các flow UI vẫn đi qua `legacy_call` → sidecar Python.
+`src-tauri` hiện phụ thuộc `antares-core`, `antares-storage`, `antares-bridge` và
+`antares-app` (composition root F-14 — chỉ 4/16 crate). 12 crate còn lại (`downloads`,
+`process`, `java`, `launch`, `net`, `profiles`, `system`, `diagnostics`, `optimization`,
+`mods`, `resources`, `visuals`)**chưa được nối vào Tauri command surface** — code +
+test chạy nhưng chưa phải runtime của app; các flow UI domain vẫn đi qua `legacy_call`
+→ sidecar Python (command đầu tiên qua composition root: `app_storage_info`).
 
-Lộ trình: tạo crate composition root (`antares-app`) rồi nối từng nhóm command theo
-kế hoạch Batch 04–13 trong kế hoạch no-Python (docs/architecture), sau đó mới gỡ
-`legacy_*` (Batch 14) và xoá Python (Batch 15).
+Lộ trình: nối từng nhóm command qua `antares-app` theo kế hoạch Batch 05–13 trong
+kế hoạch no-Python (docs/architecture), sau đó mới gỡ `legacy_*` (Batch 14) và xoá
+Python (Batch 15).
 
 ## Milestone hiện tại
 
@@ -91,3 +92,8 @@ kế hoạch Batch 04–13 trong kế hoạch no-Python (docs/architecture), sau
 - [x] Batch 6 Profiles · 7a Mods · 7b Modpack/Detail · 8a Asset Library · 8b Resource
   Studio · 9 Visual Studio (+ Three.js totem) · 10 Optimization · 11 Network Lab ·
   12 Runtime/Packet · 13 Diagnostics — qua legacy bridge (chi tiết trong BASELINE.md)
+- [x] no-Python Batch 01–04 (audit F-01…F-14): rustls TLS thật, URL parse + body cap
+  hard, TaskRegistry fail + history cap, process tests cross-platform Windows +
+  `CREATE_NO_WINDOW`, LogMux §114/§115 (merge timestamp + scoped log file),
+  `check_endpoints` song song, composition root `antares-app` (AppServices + typed
+  command errors §117 mirror TS ErrorCodes + command `app_storage_info` qua root)

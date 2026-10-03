@@ -31,7 +31,9 @@ Catalog tập trung — không hardcode string lẻ trong UI:
 
 ```text
 TS:   ErrorCodes / ErrorDomain trong types/protocol.ts
-Rust: codes::* trong protocol/error.rs
+Rust: codes::* (nguồn `antares-app::error::codes`, re-export trong
+      protocol/error.rs — test `ts_error_codes_are_all_in_rust_catalog` bắt
+      code có ở TS mà thiếu ở Rust ngay khi cargo test)
 ```
 
 Codes hiện có: `APP_INTERNAL`, `APP_NOT_READY`, `CONFIG_INVALID`, `STORAGE_WRITE_FAILED`,
@@ -74,6 +76,8 @@ Rust → listen('antares://event') → ingestRaw (validate)
 Thêm command mới theo 4 bước:
 
 1. Rust: handler trong `src-tauri/src/commands/<domain>.rs` trả `AntaresResponse<T>`
+   (kết quả service typed §117 → `AntaresResponse::from_result`; service lấy từ
+   composition root `antares-app::AppServices` — không tự new trong handler)
 2. Rust: đăng ký trong `lib.rs` `invoke_handler`
 3. TS: entry trong `types/commands.ts` `CommandSchema`
 4. TS: helper trong `services/<domain>Commands.ts` + browser fallback nếu cần dev offline

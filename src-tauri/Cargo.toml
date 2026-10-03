@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 antares-core = { path = "../crates/antares-core" }
 antares-bridge = { path = "../crates/antares-bridge" }
+antares-app = { path = "../crates/antares-app" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde.workspace = true

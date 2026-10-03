@@ -74,6 +74,7 @@ export interface CommandSchema {
   'app_ping': { request: void; response: PingPayload }
   'app_version': { request: void; response: VersionPayload }
   'app_storage_mode': { request: void; response: StorageMode }
+  'app_storage_info': { request: void; response: StorageInfoPayload }
   'app_test_event': { request: void; response: TestEventPayload }
   'core_status': { request: void; response: CoreStatusPayload }
   'core_spawn_task': {
@@ -110,6 +111,12 @@ export interface VersionPayload {
 
 export interface TestEventPayload {
   delivered: boolean
+}
+
+/** Mirror của StorageReport trong crates/antares-app/src/services.rs (F-14). */
+export interface StorageInfoPayload {
+  root: string
+  scopes: { dir: string; exists: boolean }[]
 }
 
 /** Helper type: response envelope cho một command bất kỳ. */
