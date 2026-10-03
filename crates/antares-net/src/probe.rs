@@ -201,13 +201,31 @@ pub fn dns_lookup(host: &str) -> DnsResult {
     }
 }
 
-/// Parity `check_endpoints` — tuần tự (legacy song song qua thread pool; Rust
-/// phase này giữ sync đơn giản, song song hoá khi nối tokio ở Tauri shell).
+/// F-13 — chạy `f(i)` cho `i` in `0..len`, mỗi phần tử 1 thread (scope join),
+/// trả kết quả đúng thứ tự input. List endpoint nhỏ + cố định → 1 thread/phần
+/// tử = parity `ThreadPoolExecutor(max_workers=len(ENDPOINTS))` của legacy,
+/// không cần pool thật.
+fn parallel_map<T: Send>(len: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    let f = &f; // copy ref vào từng closure (f không move được nhiều lần)
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..len).map(|i| scope.spawn(move || f(i))).collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().expect("endpoint check thread"))
+            .collect()
+    })
+}
+
+/// Parity `check_endpoints` — SONG SONG (F-13): legacy dùng
+/// `ThreadPoolExecutor(max_workers=len(ENDPOINTS))` → ở đây 1 scope-thread
+/// mỗi endpoint. Wall-clock ≈ max(RTT) thay vì sum — với timeout 4s, mạng
+/// xấu 1 endpoint không kẹp cả danh sách 5 (5×4s=20s → ~4s). Sort by id giữ
+/// nguyên: thứ tự kết quả không phụ thứ tự hoàn thành.
 pub fn check_endpoints(timeout: Duration) -> Vec<(String, TcpCheck)> {
-    let mut results: Vec<(String, TcpCheck)> = ENDPOINTS
-        .iter()
-        .map(|(id, host, port)| ((*id).to_string(), tcp_check(host, *port, timeout)))
-        .collect();
+    let mut results: Vec<(String, TcpCheck)> = parallel_map(ENDPOINTS.len(), |i| {
+        let (id, host, port) = ENDPOINTS[i];
+        (id.to_string(), tcp_check(host, port, timeout))
+    });
     // Thứ tự ổn định theo tên endpoint (parity sort by id).
     results.sort_by(|a, b| a.0.cmp(&b.0));
     results
@@ -290,5 +308,27 @@ mod tests {
         let mut sorted = ids.clone();
         sorted.sort();
         assert_eq!(ids, sorted);
+    }
+
+    #[test]
+    fn parallel_map_preserves_input_order() {
+        // Kết quả join theo thứ tự index → không cần sort lại (parity thứ tự input).
+        let out = parallel_map(8, |i| i * i);
+        assert_eq!(out, vec![0, 1, 4, 9, 16, 25, 36, 49]);
+        assert!(parallel_map(0, |i: usize| i).is_empty());
+    }
+
+    #[test]
+    fn parallel_map_runs_items_concurrently() {
+        // F-13: 6 × 200ms tuần tự = 1200ms; song song ≈ 200ms. Ngưỡng 700ms
+        // dư dả cho CI chậm nhưng vẫn fail rõ nếu quay về tuần tự.
+        let started = Instant::now();
+        let out = parallel_map(6, |_| std::thread::sleep(Duration::from_millis(200)));
+        let elapsed = started.elapsed();
+        assert_eq!(out.len(), 6);
+        assert!(
+            elapsed < Duration::from_millis(700),
+            "elapsed {elapsed:?} — parallel_map không song song?"
+        );
     }
 }

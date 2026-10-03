@@ -23,7 +23,7 @@ CRUD, ExitAnalyzer, CompanionPairing, Mojang manifest) — đánh dấu như bê
 | `antares-process` | process | record §113, cleanup policy, registry, sweep | **xong**: spawn/wait/stop thật (`std::process`, `CREATE_NO_WINDOW`), stdin prompt graceful → kill, exit→state; **LogMux** — merge stdout/stderr timestamp §114 (ring bounded §88) + scoped log file §115 |
 | `antares-java` | Java manager | model §110, resolve order, parse version | **xong phase 3**: `discovery` — scan known dirs theo OS + JAVA_HOME + PATH (resolve symlink, dedupe giữ thứ tự), `detect_major` qua `java -showversion` timeout 15s, `java_info`/`scan_java_infos`. Còn: Mojang runtime **download** (manifest đã có ở antares-net, runtime download ⏳) |
 | `antares-launch` | Minecraft launch | session §112, preflight, argument builder | **xong phase 2+3+4**: `JavaResolver` + `ArtifactResolver` §104; `planner` — `required_java_major` §108 + `plan_launch`; **`exit.rs`** — `ExitAnalyzer` §116 (ingest→normalize→fingerprint→classify→rank→recommendation, weak evidence → Unknown/confidence 0, không LLM) + `CompanionPairing` (ghi companion.json atomic parity `write_pairing_for_instance` — server off → None) |
-| `antares-net` | network | rtt_stats parity `_probe_stats`, PacketRing §122 | **xong phase 2+3+4**: ping §119 + `probe.rs` (tcp_check/probe/dns/endpoints); **`manifest.rs`** — Mojang manifest parity `ManifestService` + `DiskCache` TTL 30 phút `{ts,value}` + stale fallback offline (mục 60) + `download_size` (client + libraries artifact/classifiers + assetIndex). Còn: song song hoá endpoints khi có tokio |
+| `antares-net` | network | rtt_stats parity `_probe_stats`, PacketRing §122 | **xong phase 2+3+4**: ping §119 + `probe.rs` (tcp_check/probe/dns/endpoints); **`manifest.rs`** — Mojang manifest parity `ManifestService` + `DiskCache` TTL 30 phút `{ts,value}` + stale fallback offline (mục 60) + `download_size` (client + libraries artifact/classifiers + assetIndex). endpoints đã song song (F-13 scope-thread); download pipeline async giữ cho Tokio stage (audit §12: không Tokio hoá vội) |
 | `antares-profiles` | profiles | GAME_KEYS 28 key, coerce parity, options parse, diff §107 | **xong phase 2+4**: `write_options_merged` parity; **`store.rs`** — `ProfileStore` CRUD qua antares-storage (state `profiles-state.json` atomic, id `prof-YYYYmmdd-HHMMSS-<6hex>`, duplicate uniquify, delete confirm, mark_applied/clear_revert/launch_hint, sanitize/validate spec parity) |
 
 ## Checklist parity theo domain (cập nhật khi bọc)
@@ -130,7 +130,7 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 - [x] ✅ Mojang manifest + DiskCache TTL (phase 4 — `manifest.rs`): parity `ManifestService`
   (get_manifest/find/download_size) + `DiskCache` `{ts,value}` TTL 30 phút, stale fallback
   offline (mục 60)
-- [ ] ⏳ check_endpoints song song (hiện tuần tự — song song hoá khi có tokio)
+- [x] ✅ check_endpoints song song — scope-thread 1/endpoint parity ThreadPoolExecutor legacy (F-13: wall-clock ≈ max(RTT) thay vì sum 5×timeout; sort by id giữ nguyên)
 
 ### Profiles (legacy `services/profiles`)
 - [x] ✅ GAME_KEYS 28 key + GAME_KEY_ORDER — parity `keys.py` (đếm verified)

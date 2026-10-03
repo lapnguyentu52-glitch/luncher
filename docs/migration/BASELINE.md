@@ -676,8 +676,9 @@ python_legacy: untouched (481 tests vẫn xanh) — removal ở Batch 15
 ## Bước tiếp theo (theo thứ tự §227 — không được đảo)
 
 ```text
-Batch 14 — Còn lại (phase sau khi có TLS/tokio): TLS thật, song song hoá
-           endpoints, §114 stdout pipeline, runtime download Mojang
+Batch 14 — Còn lại: runtime download Mojang (đã xong 2026-10-02/03: TLS thật
+           rustls F-01, endpoints song song F-13 scope-thread, §114/§115 LogMux
+           F-12 — download pipeline async giữ cho Tokio stage theo audit §12)
 Batch 15 — parity check (kế hoạch chi tiết trong PARITY.md): B15.1 tạo 6 crate
            còn thiếu (mods/resources/visuals/optimization/system/diagnostics —
            73 method) → B15.2 wiring Tauri command → B15.3 A/B parity 118 method
