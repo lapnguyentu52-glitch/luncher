@@ -330,17 +330,19 @@ mod tests {
         assert_eq!(code, 0);
 
         // Callback chỉ nhận stdout (parity on_line) — stderr đi vào mux.
-        assert_eq!(lines, vec!["out-line".to_string()]);
+        // cmd (Windows) in cả space trước `&`/redirect → trim_end khi so sánh.
+        let stdout_lines: Vec<&str> = lines.iter().map(|l| l.trim_end()).collect();
+        assert_eq!(stdout_lines, vec!["out-line"]);
 
         // 2 thread pump song song → thứ tự trong ring không xác định → kiểm `any`.
         let recent = mux.recent();
         assert_eq!(recent.len(), 2, "ring: {recent:?}");
         assert!(recent
             .iter()
-            .any(|r| r.stream == LogStream::Stdout && r.line == "out-line"));
+            .any(|r| r.stream == LogStream::Stdout && r.line.trim_end() == "out-line"));
         assert!(recent
             .iter()
-            .any(|r| r.stream == LogStream::Stderr && r.line == "err-line"));
+            .any(|r| r.stream == LogStream::Stderr && r.line.trim_end() == "err-line"));
         assert_eq!(mux.dropped(), 0);
     }
 
