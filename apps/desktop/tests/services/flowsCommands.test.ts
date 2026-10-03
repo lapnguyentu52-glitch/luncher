@@ -41,16 +41,6 @@ describe('flows commands (M6 smoke)', () => {
     registerBrowserFallback('legacy_call', (_cmd, args) => {
       const a = args as { method: string; params?: Record<string, unknown> }
       switch (a.method) {
-        case 'instances.list':
-          return { ok: true, data: { instances: [demoInstance] }, warnings: [] }
-        case 'instances.select':
-          return { ok: true, data: { selected: a.params?.instanceId }, warnings: [] }
-        case 'instances.create':
-          return {
-            ok: true,
-            data: { instance: { ...demoInstance, name: String(a.params?.name) } },
-            warnings: [],
-          }
         case 'java.list':
           return { ok: true, data: { javas: [{ path: '/j', exe: '/j/java', major: 21, name: 'jdk21' }] }, warnings: [] }
         case 'play.preflight':
@@ -74,6 +64,20 @@ describe('flows commands (M6 smoke)', () => {
         default:
           return { ok: false, error: { code: 'METHOD_NOT_FOUND', message: a.method }, warnings: [] }
       }
+    })
+    // Batch 05 — group instances native (không qua legacy_call).
+    registerBrowserFallback('instances_list', () => ({
+      ok: true,
+      data: { instances: [demoInstance] },
+      warnings: [],
+    }))
+    registerBrowserFallback('instances_select', (_cmd, args) => {
+      const a = args as { instanceId: string }
+      return { ok: true, data: { selected: a.instanceId }, warnings: [] }
+    })
+    registerBrowserFallback('instances_create', (_cmd, args) => {
+      const a = args as { name: string }
+      return { ok: true, data: { instance: { ...demoInstance, name: a.name } }, warnings: [] }
     })
   })
   afterEach(() => {

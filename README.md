@@ -99,6 +99,12 @@ Python (Batch 15).
   command errors §117 mirror TS ErrorCodes + command `app_storage_info` qua root)
 - [x] no-Python M5 flag `ANTA_RUST_ONLY` (runtime, opt-in): bật → sidecar không
   auto-start (không cấu hình program/env Python), lệnh `legacy_start/call/restart/
-  shutdown` trả typed `LEGACY_DISABLED` trước khi chạm bridge, `core_status.rustOnly`
-  expose cho UI — cổng chặn đầy đủ UI-side + “mọi tab chạy native” hoàn tất sau
+  shutdown` trả typed `LEGACY_DISABLED` trước khi chạm bridge,  `core_status.rustOnly` expose cho UI — cổng chặn đầy đủ UI-side + “mọi tab chạy native” hoàn tất sau
   Batch 05–13 nối xong native commands
+- [x] no-Python Batch 05 — group **instances native** (F-14): `InstanceStore` trong
+  `antares-app` parity `InstanceService` (list/get/create + validate `is_safe_name`,
+  7 subdir game, `instance.json` atomic; `select` ghi `selectedInstance` vào
+  `config/settings.json` — cùng file sidecar ConfigManager) + 4 Tauri command
+  `instances_*` + UI `flowsCommands` bỏ `legacy_call` cho instances (các flow khác
+  vẫn bridge đến Batch 06+); health/app đã có native từ trước (`app_ping`,
+  `app_storage_info`, `legacy_status`, `legacy_shutdown`)

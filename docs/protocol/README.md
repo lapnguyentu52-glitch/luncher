@@ -39,7 +39,8 @@ Rust: codes::* (nguồn `antares-app::error::codes`, re-export trong
 Codes hiện có: `APP_INTERNAL`, `APP_NOT_READY`, `CONFIG_INVALID`, `STORAGE_WRITE_FAILED`,
 `NETWORK_UNAVAILABLE`, `IPC_SESSION_STALE`, `INSTANCE_LOCKED`, `JAVA_NOT_FOUND`,
 `MC_VERSION_UNKNOWN`, `LEGACY_DISABLED` (M5 — `ANTA_RUST_ONLY=1` chặn lệnh legacy,
-UI nhận code này để chuyển flow native).
+UI nhận code này để chuyển flow native), `INSTANCE_NAME_INVALID` (Batch 05 —
+`instances.create` tên không hợp lệ).
 Rust-side catalog thêm (chưa cần phía UI): `STORAGE_PATH_ESCAPED`, `PROCESS_NOT_FOUND`,
 `PROCESS_STILL_RUNNING`, `PROCESS_EXECUTABLE_NOT_FOUND`, `PROCESS_SPAWN_FAILED`.
 

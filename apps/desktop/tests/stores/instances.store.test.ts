@@ -28,7 +28,7 @@ describe('instances store load phase (§68 offline)', () => {
   })
 
   it('backend ok → ready với items', async () => {
-    registerBrowserFallback('legacy_call', () => ({
+    registerBrowserFallback('instances_list', () => ({
       ok: true,
       data: { instances: [demoInstance] },
       warnings: [],
@@ -41,7 +41,7 @@ describe('instances store load phase (§68 offline)', () => {
   // Regression: trước đây IpcError bị toAntaresError bọc lại thành APP_INTERNAL
   // → phase luôn là 'error' dù backend trả đúng IPC_SESSION_STALE (bridge chưa chạy).
   it('bridge chưa chạy (IPC_SESSION_STALE) → offline, không phải error', async () => {
-    registerBrowserFallback('legacy_call', () => ({
+    registerBrowserFallback('instances_list', () => ({
       ok: false,
       error: { code: 'IPC_SESSION_STALE', message: 'bridge not running', retryable: true },
       warnings: [],
@@ -53,7 +53,7 @@ describe('instances store load phase (§68 offline)', () => {
   })
 
   it('sidecar không tìm thấy (IPC_SIDECAR_NOT_FOUND) → offline', async () => {
-    registerBrowserFallback('legacy_call', () => ({
+    registerBrowserFallback('instances_list', () => ({
       ok: false,
       error: { code: 'IPC_SIDECAR_NOT_FOUND', message: 'no sidecar', retryable: false },
       warnings: [],
@@ -64,7 +64,7 @@ describe('instances store load phase (§68 offline)', () => {
   })
 
   it('lỗi khác → error state', async () => {
-    registerBrowserFallback('legacy_call', () => ({
+    registerBrowserFallback('instances_list', () => ({
       ok: false,
       error: { code: 'METHOD_NOT_FOUND', message: 'no.such', retryable: false },
       warnings: [],

@@ -9,8 +9,6 @@ description = "F-14/M3 — native service composition root cho Tauri command sur
 antares-process = { path = "../antares-process" }
 antares-storage = { path = "../antares-storage" }
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 log.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true

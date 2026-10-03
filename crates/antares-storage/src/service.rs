@@ -36,8 +36,56 @@ pub struct StorageHandle {
 }
 
 impl StorageHandle {
+    /// Root tuyệt đối của scope — metadata cần path thật
+    /// (vd `instance.json` field `directory`).
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     fn resolve(&self, relative: &str) -> StorageResult<PathBuf> {
         sanitize_relative(relative).map(|rel| self.root.join(rel))
+    }
+
+    /// §98.1 — tạo thư mục (kèm cha) trong scope — sanitize như read/write.
+    pub fn ensure_dir(&self, relative: &str) -> StorageResult<PathBuf> {
+        let path = self.resolve(relative)?;
+        std::fs::create_dir_all(&path).map_err(|source| StorageError::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+        Ok(path)
+    }
+
+    /// §98.1 — tên thư mục con TRỰC TIẾP dưới scope root (bỏ file) — parity
+    /// instance scan (`InstanceService.list`). Không nhận relative → không có
+    /// cửa traversal. Scope chưa tồn tại → rỗng (parity `exists() else ()`).
+    pub fn list_dirs(&self) -> StorageResult<Vec<String>> {
+        let read = match std::fs::read_dir(&self.root) {
+            Ok(read) => read,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(source) => {
+                return Err(StorageError::Io {
+                    path: self.root.display().to_string(),
+                    source,
+                })
+            }
+        };
+        let mut names = Vec::new();
+        for entry in read {
+            let entry = entry.map_err(|source| StorageError::Io {
+                path: self.root.display().to_string(),
+                source,
+            })?;
+            if entry.path().is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    names.push(name.to_string());
+                }
+            }
+        }
+        names.sort();
+        Ok(names)
     }
 
     /// §98.1 — read_json

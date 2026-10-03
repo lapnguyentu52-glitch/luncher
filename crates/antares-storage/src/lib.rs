@@ -84,4 +84,42 @@ mod tests {
         handle.remove_safe("2026/09/log.json").expect("remove");
         assert!(handle.list_scoped("2026/09").expect("list").is_empty());
     }
+
+    #[test]
+    fn ensure_dir_and_list_dirs_scoped() {
+        let root = temp_root("dirs");
+        let service = StorageService::new(root.clone());
+        let handle = service.scoped(ScopedRoot::Instances);
+
+        // Scope chưa tồn tại → rỗng (parity InstanceService.list exists() else ()).
+        assert!(handle.list_dirs().expect("list empty").is_empty());
+
+        handle.ensure_dir("inst-1/game").expect("ensure nested");
+        handle.ensure_dir("inst-2").expect("ensure");
+        assert!(root.join("instances/inst-1/game").is_dir());
+
+        // File không lẫn vào danh sách thư mục; thứ tự ổn định.
+        handle
+            .write_json_atomic("inst-1/instance.json", &serde_json::json!({}))
+            .expect("write");
+        assert_eq!(handle.list_dirs().expect("list"), vec!["inst-1", "inst-2"]);
+        assert_eq!(handle.root(), root.join("instances").as_path());
+
+        // Traversal bị chặn giống read/write (§50).
+        assert!(handle.ensure_dir("../escape").is_err());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn config_scope_is_separate_dir() {
+        let root = temp_root("config-scope");
+        let service = StorageService::new(root.clone());
+        let handle = service.scoped(ScopedRoot::Config);
+        handle
+            .write_json_atomic("settings.json", &serde_json::json!({"a": 1}))
+            .expect("write");
+        assert!(root.join("config/settings.json").is_file());
+        let _ = fs::remove_dir_all(&root);
+    }
 }

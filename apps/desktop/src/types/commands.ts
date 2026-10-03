@@ -89,6 +89,20 @@ export interface CommandSchema {
   }
   'core_complete_task': { request: { taskId: string }; response: CoreTask }
   'core_cancel_task': { request: { taskId: string }; response: CoreTask }
+  // Batch 05 — native group instances (qua antares-app composition root)
+  'instances_list': { request: void; response: { instances: AntaresInstance[] } }
+  'instances_get': { request: { instanceId: string }; response: { instance: AntaresInstance } }
+  'instances_create': {
+    request: {
+      name: string
+      minecraftVersion: string
+      loader?: string
+      memoryMaxMb?: number
+      memoryMinMb?: number
+    }
+    response: { instance: AntaresInstance }
+  }
+  'instances_select': { request: { instanceId: string }; response: { selected: string } }
   'legacy_status': { request: void; response: LegacyStatusPayload }
   'legacy_start': { request: void; response: LegacyVersionInfo }
   'legacy_call': {

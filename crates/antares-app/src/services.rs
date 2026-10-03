@@ -7,6 +7,7 @@ use antares_process::ProcessRegistry;
 use antares_storage::{ScopedRoot, StorageService};
 
 use crate::error::AppResult;
+use crate::instances::InstanceStore;
 use crate::runtime::RuntimeFlags;
 
 /// Managed service container (Batch 04). Command nhận `Arc<AppServices>` từ
@@ -15,6 +16,7 @@ use crate::runtime::RuntimeFlags;
 pub struct AppServices {
     storage: StorageService,
     processes: Mutex<ProcessRegistry>,
+    instances: InstanceStore,
     flags: RuntimeFlags,
 }
 
@@ -26,9 +28,15 @@ impl AppServices {
     }
 
     pub fn with_flags(root: impl Into<PathBuf>, flags: RuntimeFlags) -> Self {
+        let storage = StorageService::new(root);
+        let instances = InstanceStore::new(
+            storage.scoped(ScopedRoot::Instances),
+            storage.scoped(ScopedRoot::Config),
+        );
         Self {
-            storage: StorageService::new(root),
+            storage,
             processes: Mutex::new(ProcessRegistry::default()),
+            instances,
             flags,
         }
     }
@@ -36,6 +44,11 @@ impl AppServices {
     /// Runtime flags (M5) — command/legacy guard đọc từ đây.
     pub fn flags(&self) -> RuntimeFlags {
         self.flags
+    }
+
+    /// Group instances (Batch 05) — parity sidecar `instances.*` handlers.
+    pub fn instances(&self) -> &InstanceStore {
+        &self.instances
     }
 
     pub fn storage(&self) -> &StorageService {
@@ -117,7 +130,10 @@ mod tests {
         assert_eq!(report.scopes.len(), ScopedRoot::ALL.len());
         assert!(report.scopes.iter().all(|s| s.exists), "vừa tạo xong phải tồn tại");
         let dirs: Vec<&str> = report.scopes.iter().map(|s| s.dir.as_str()).collect();
-        assert_eq!(dirs, vec!["app-data", "cache", "logs", "profiles", "instances", "backups"]);
+        assert_eq!(
+            dirs,
+            vec!["app-data", "config", "cache", "logs", "profiles", "instances", "backups"]
+        );
         assert!(root.join("logs").is_dir());
 
         // Idempotent — gọi lại không lỗi, vẫn report đủ.
