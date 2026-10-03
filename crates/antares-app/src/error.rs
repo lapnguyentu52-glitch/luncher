@@ -18,6 +18,9 @@ pub mod codes {
     pub const INSTANCE_LOCKED: &str = "INSTANCE_LOCKED";
     pub const JAVA_NOT_FOUND: &str = "JAVA_NOT_FOUND";
     pub const MC_VERSION_UNKNOWN: &str = "MC_VERSION_UNKNOWN";
+    /// M5 — `ANTA_RUST_ONLY=1`: lệnh legacy bị cắt ở tầng command (không spawn
+    /// Python subprocess); UI nhận code này để chuyển sang flow native.
+    pub const LEGACY_DISABLED: &str = "LEGACY_DISABLED";
     /// §113 — process record (Rust-side catalog, Batch 07 wiring).
     pub const PROCESS_NOT_FOUND: &str = "PROCESS_NOT_FOUND";
     pub const PROCESS_STILL_RUNNING: &str = "PROCESS_STILL_RUNNING";
@@ -36,6 +39,7 @@ pub mod codes {
         INSTANCE_LOCKED,
         JAVA_NOT_FOUND,
         MC_VERSION_UNKNOWN,
+        LEGACY_DISABLED,
         PROCESS_NOT_FOUND,
         PROCESS_STILL_RUNNING,
         PROCESS_EXECUTABLE_NOT_FOUND,

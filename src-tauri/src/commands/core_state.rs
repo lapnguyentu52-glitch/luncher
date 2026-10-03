@@ -14,6 +14,8 @@ pub struct CoreStatusPayload {
     pub uptime_ms: u64,
     pub hub: antares_core::events::HubStats,
     pub active_tasks: Vec<antares_core::tasks::Task>,
+    /// M5 — `ANTA_RUST_ONLY=1`: UI biết mà chuyển flow native thay vì legacy_call.
+    pub rust_only: bool,
 }
 
 static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -29,6 +31,7 @@ pub fn core_status(state: tauri::State<'_, CoreState>) -> AntaresResponse<CoreSt
         uptime_ms: started().elapsed().as_millis() as u64,
         hub: state.app.events.stats(),
         active_tasks: state.app.tasks.active(),
+        rust_only: state.services().flags().rust_only,
     })
 }
 

@@ -64,6 +64,8 @@ export interface CoreStatusPayload {
   uptimeMs: number
   hub: CoreHubStats
   activeTasks: CoreTask[]
+  /** M5 — ANTA_RUST_ONLY=1: legacy_call bị chặn ở Rust (LEGACY_DISABLED). */
+  rustOnly: boolean
 }
 
 /**

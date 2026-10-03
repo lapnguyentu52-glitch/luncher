@@ -27,6 +27,7 @@ registerBrowserFallback('core_status', () => ({
     uptimeMs: 42_000,
     hub: { published: 0, dropped: 0, pendingLatest: 0, pendingCoalesce: 0, pendingBatched: 0, pendingLossless: 0 },
     activeTasks: [] as CoreTask[],
+    rustOnly: false,
   },
   warnings: [],
 }))

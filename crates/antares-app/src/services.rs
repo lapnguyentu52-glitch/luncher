@@ -7,6 +7,7 @@ use antares_process::ProcessRegistry;
 use antares_storage::{ScopedRoot, StorageService};
 
 use crate::error::AppResult;
+use crate::runtime::RuntimeFlags;
 
 /// Managed service container (Batch 04). Command nhận `Arc<AppServices>` từ
 /// managed state — không tự new service, không đụng filesystem trực tiếp
@@ -14,14 +15,27 @@ use crate::error::AppResult;
 pub struct AppServices {
     storage: StorageService,
     processes: Mutex<ProcessRegistry>,
+    flags: RuntimeFlags,
 }
 
 impl AppServices {
+    /// Đọc runtime flags từ env thật (`ANTA_RUST_ONLY`) — test dùng `with_flags`
+    /// để không phụ thuộc global state.
     pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self::with_flags(root, RuntimeFlags::from_env())
+    }
+
+    pub fn with_flags(root: impl Into<PathBuf>, flags: RuntimeFlags) -> Self {
         Self {
             storage: StorageService::new(root),
             processes: Mutex::new(ProcessRegistry::default()),
+            flags,
         }
+    }
+
+    /// Runtime flags (M5) — command/legacy guard đọc từ đây.
+    pub fn flags(&self) -> RuntimeFlags {
+        self.flags
     }
 
     pub fn storage(&self) -> &StorageService {
@@ -149,5 +163,16 @@ mod tests {
             registry.get(&id).map(|record| record.owner.clone())
         });
         assert_eq!(owner.as_deref(), Some("minecraft"));
+    }
+
+    #[test]
+    fn flags_carried_through_services() {
+        let root = temp_root("flags");
+        let rust_only = AppServices::with_flags(&root, RuntimeFlags { rust_only: true });
+        assert!(rust_only.flags().rust_only);
+
+        let normal = AppServices::with_flags(&root, RuntimeFlags::default());
+        assert!(!normal.flags().rust_only);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

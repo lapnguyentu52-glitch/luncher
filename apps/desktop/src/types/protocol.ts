@@ -57,6 +57,7 @@ export const ErrorCodes = {
   InstanceLocked: 'INSTANCE_LOCKED',
   JavaNotFound: 'JAVA_NOT_FOUND',
   McVersionUnknown: 'MC_VERSION_UNKNOWN',
+  LegacyDisabled: 'LEGACY_DISABLED',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]

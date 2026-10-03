@@ -11,7 +11,9 @@
 //! trong service crate. Lỗi đi theo typed `AppError` (§117) → envelope §96.
 
 pub mod error;
+pub mod runtime;
 pub mod services;
 
 pub use error::{codes, AppError, AppResult};
+pub use runtime::RuntimeFlags;
 pub use services::{AppServices, ScopeInfo, StorageReport};

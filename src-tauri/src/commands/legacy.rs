@@ -3,7 +3,7 @@ use antares_bridge::BridgeError;
 use serde::Serialize;
 use tauri::Manager;
 
-use crate::protocol::error::AntaresError;
+use crate::protocol::error::{codes, AntaresError};
 use crate::protocol::response::AntaresResponse;
 use crate::state::core_state::CoreState;
 
@@ -31,8 +31,23 @@ pub fn legacy_status(state: tauri::State<'_, CoreState>) -> AntaresResponse<Lega
 /// 3s (shutdown) không được chặn UI thread. Dùng AppHandle (owned) thay vì
 /// State<'_> để async command không bắt buộc trả Result (Tauri yêu cầu
 /// input có reference ⇒ Result, mà envelope AntaresResponse đã là contract).
+/// M5 — `ANTA_RUST_ONLY=1`: chặn lệnh legacy mutate TRƯỚC khi chạm bridge —
+/// không sinh Python subprocess, trả typed §117 (`LEGACY_DISABLED`) cho UI để
+/// chuyển sang flow native. (`legacy_status` vẫn đọc được — chỉ query, không spawn.)
+fn legacy_refusal(rust_only: bool) -> Option<AntaresError> {
+    rust_only.then(|| {
+        AntaresError::from(antares_app::AppError::new(
+            codes::LEGACY_DISABLED,
+            "rust-only mode (ANTA_RUST_ONLY=1): legacy sidecar disabled",
+        ))
+    })
+}
+
 #[tauri::command]
 pub async fn legacy_start(app: tauri::AppHandle) -> AntaresResponse<VersionInfo> {
+    if let Some(err) = legacy_refusal(app.state::<CoreState>().services().flags().rust_only) {
+        return AntaresResponse::err(err);
+    }
     let legacy = app.state::<CoreState>().legacy();
     match tauri::async_runtime::spawn_blocking(move || legacy.start()).await {
         Ok(result) => result_to_response(result),
@@ -97,6 +112,9 @@ pub async fn legacy_call(
     params: Option<serde_json::Value>,
     timeout_ms: Option<u64>,
 ) -> AntaresResponse<serde_json::Value> {
+    if let Some(err) = legacy_refusal(app.state::<CoreState>().services().flags().rust_only) {
+        return AntaresResponse::err(err);
+    }
     if !is_allowed_legacy_method(&method) {
         return AntaresResponse::err(AntaresError::new(
             "METHOD_DENIED",
@@ -119,6 +137,9 @@ pub async fn legacy_call(
 
 #[tauri::command]
 pub async fn legacy_restart(app: tauri::AppHandle) -> AntaresResponse<VersionInfo> {
+    if let Some(err) = legacy_refusal(app.state::<CoreState>().services().flags().rust_only) {
+        return AntaresResponse::err(err);
+    }
     let legacy = app.state::<CoreState>().legacy();
     match tauri::async_runtime::spawn_blocking(move || legacy.restart()).await {
         Ok(result) => result_to_response(result),
@@ -128,6 +149,9 @@ pub async fn legacy_restart(app: tauri::AppHandle) -> AntaresResponse<VersionInf
 
 #[tauri::command]
 pub async fn legacy_shutdown(app: tauri::AppHandle) -> AntaresResponse<serde_json::Value> {
+    if let Some(err) = legacy_refusal(app.state::<CoreState>().services().flags().rust_only) {
+        return AntaresResponse::err(err);
+    }
     let legacy = app.state::<CoreState>().legacy();
     match tauri::async_runtime::spawn_blocking(move || {
         legacy
@@ -158,7 +182,17 @@ fn to_antares(err: &BridgeError) -> AntaresError {
 
 #[cfg(test)]
 mod tests {
-    use super::is_allowed_legacy_method;
+    use super::{is_allowed_legacy_method, legacy_refusal};
+    use crate::protocol::error::codes;
+
+    #[test]
+    fn rust_only_refusal_is_typed_and_not_retryable() {
+        assert!(legacy_refusal(false).is_none(), "flag tắt → cho phép legacy");
+        let err = legacy_refusal(true).expect("flag bật phải từ chối");
+        assert_eq!(err.code, codes::LEGACY_DISABLED);
+        assert!(!err.retryable, "flag bật thì retry vô nghĩa — cần flow native");
+        assert!(err.message.contains("ANTA_RUST_ONLY"), "{}", err.message);
+    }
 
     #[test]
     fn allows_registered_sidecar_groups() {

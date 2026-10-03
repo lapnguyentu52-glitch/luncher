@@ -41,35 +41,44 @@ impl CoreState {
         }
         log::info!("storage root: {:?}", root);
 
+        // F-14/M5 — composition root tạo trước: runtime flags (ANTA_RUST_ONLY)
+        // quyết định có cấu hình sidecar hay không.
+        let services = Arc::new(antares_app::AppServices::new(root.clone()));
+
         // §234 — legacy sidecar program: env override cho dev (vd:
         // "python3 legacy/python/sidecar.py"), sau bundle là externalBin.
         let bridge = LegacyBridge::new();
-        let program = std::env::var("ANTARES_LEGACY_SIDECAR").ok().or_else(|| {
-            // externalBin: cạnh exe — NSIS strip hậu tố triple khi cài
-            // (antares-legacy.exe), portable giữ triple (antares-legacy-<triple>.exe).
-            let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-            sidecar_candidates().iter().find_map(|name| {
-                let p = exe_dir.join(name);
-                p.exists().then(|| p.to_string_lossy().into_owned())
-            })
-        });
-        match program {
-            Some(program) => {
-                log::info!("legacy sidecar configured: {program}");
-                bridge.set_program(program);
+        if services.flags().rust_only {
+            // M5 — rust-only: không set program/env cho sidecar → không bao giờ
+            // auto-start Python; lệnh legacy_* mutate trả LEGACY_DISABLED ở
+            // command layer (double guard).
+            log::info!("rust-only mode (ANTA_RUST_ONLY=1): sidecar auto-start disabled");
+        } else {
+            let program = std::env::var("ANTARES_LEGACY_SIDECAR").ok().or_else(|| {
+                // externalBin: cạnh exe — NSIS strip hậu tố triple khi cài
+                // (antares-legacy.exe), portable giữ triple (antares-legacy-<triple>.exe).
+                let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+                sidecar_candidates().iter().find_map(|name| {
+                    let p = exe_dir.join(name);
+                    p.exists().then(|| p.to_string_lossy().into_owned())
+                })
+            });
+            match program {
+                Some(program) => {
+                    log::info!("legacy sidecar configured: {program}");
+                    bridge.set_program(program);
+                }
+                None => {
+                    log::info!("legacy sidecar not configured (ANTARES_LEGACY_SIDECAR unset, none next to exe)");
+                }
             }
-            None => {
-                log::info!("legacy sidecar not configured (ANTARES_LEGACY_SIDECAR unset, none next to exe)");
+            // Mục 5.1 — truyền data dir cho sidecar để Rust/Python thấy cùng dữ liệu.
+            // ANTARES_ROOT = cạnh exe để portable.flag khớp §218.
+            bridge.set_env("ANTARES_DATA_DIR", root.to_string_lossy().into_owned());
+            if let Some(exe_dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(PathBuf::from)) {
+                bridge.set_env("ANTARES_ROOT", exe_dir.to_string_lossy().into_owned());
             }
         }
-        // Mục 5.1 — truyền data dir cho sidecar để Rust/Python thấy cùng dữ liệu.
-        // ANTARES_ROOT = cạnh exe để portable.flag khớp §218.
-        bridge.set_env("ANTARES_DATA_DIR", root.to_string_lossy().into_owned());
-        if let Some(exe_dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(PathBuf::from)) {
-            bridge.set_env("ANTARES_ROOT", exe_dir.to_string_lossy().into_owned());
-        }
-
-        let services = Arc::new(antares_app::AppServices::new(root.clone()));
 
         Self {
             app: Arc::new(AppState::new(root)),

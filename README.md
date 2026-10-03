@@ -97,3 +97,8 @@ Python (Batch 15).
   `CREATE_NO_WINDOW`, LogMux §114/§115 (merge timestamp + scoped log file),
   `check_endpoints` song song, composition root `antares-app` (AppServices + typed
   command errors §117 mirror TS ErrorCodes + command `app_storage_info` qua root)
+- [x] no-Python M5 flag `ANTA_RUST_ONLY` (runtime, opt-in): bật → sidecar không
+  auto-start (không cấu hình program/env Python), lệnh `legacy_start/call/restart/
+  shutdown` trả typed `LEGACY_DISABLED` trước khi chạm bridge, `core_status.rustOnly`
+  expose cho UI — cổng chặn đầy đủ UI-side + “mọi tab chạy native” hoàn tất sau
+  Batch 05–13 nối xong native commands
