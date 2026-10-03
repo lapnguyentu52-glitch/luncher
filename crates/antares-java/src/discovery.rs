@@ -259,23 +259,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    #[cfg(unix)]
+    // F-04 — bỏ cfg(unix): `which` là unix-only, thay bằng scan PATH cross-platform
+    // → test này chạy cả trên Windows CI (runner có Java preinstalled).
     #[test]
     fn detect_major_with_real_java_binary() {
-        // Chỉ chạy khi có java thật trên PATH (Codespace có sẵn).
-        let which = Command::new("which")
-            .arg("java")
-            .output()
-            .ok()
-            .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
-            .filter(|s| !s.is_empty());
-        let Some(java_path) = which else {
+        // Chỉ khẳng định khi có java thật trên PATH — máy không có → bỏ qua.
+        let Some(java) = java_on_path() else {
             return; // máy không có java → bỏ qua
         };
-        let java = PathBuf::from(java_path);
         let Some(major) = detect_major(&java) else {
             return; // binary lạ → bỏ qua (CI vẫn pass)
         };
         assert!((8..=60).contains(&major), "major {major} ngoài khoảng hợp lý");
+    }
+
+    /// `which java` parity — cross-platform (scan PATH, Windows thêm .exe).
+    fn java_on_path() -> Option<PathBuf> {
+        let path_var = std::env::var_os("PATH")?;
+        let exe = if cfg!(windows) { "java.exe" } else { "java" };
+        for dir in std::env::split_paths(&path_var) {
+            if dir.as_os_str().is_empty() {
+                continue;
+            }
+            let candidate = dir.join(exe);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        None
     }
 }

@@ -4,8 +4,10 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+pub mod logmux;
 pub mod spawn;
 
+pub use logmux::{LogMux, LogRecord, LogStream};
 pub use spawn::{spawn, stop, wait, SpawnError, SpawnedProcess};
 
 #[derive(Debug, Clone, Serialize)]

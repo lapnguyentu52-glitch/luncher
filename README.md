@@ -71,7 +71,8 @@ kế hoạch Batch 04–13 trong kế hoạch no-Python (docs/architecture), sau
   → Range bytes=N- → verify → finalize, retry 8 + backoff min(2n,8), checksum mismatch
   không backoff, 200 thay 206 → restart; phase 4: sha incremental + verify streaming
   256KB/block, `get_stream` chunk 64KB, TLS seam),
-  `antares-process` (supervisor §113, cleanup policy; phase 2: spawn/wait/stop thật),
+  `antares-process` (supervisor §113, cleanup policy; phase 2: spawn/wait/stop thật,
+  `CREATE_NO_WINDOW` Windows; LogMux §114/§115 merge timestamp + log scoped),
   `antares-java` (model §110, resolve order, parse version; phase 3: discovery scan
   dirs theo OS + JAVA_HOME/PATH + detect_major `java -showversion` parity discovery.py),
   `antares-launch` (session §112, preflight, argument builder; phase 2: JavaResolver +

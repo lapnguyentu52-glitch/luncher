@@ -20,7 +20,7 @@ CRUD, ExitAnalyzer, CompanionPairing, Mojang manifest) — đánh dấu như bê
 | Crate | Mục Batch 14 | Đã bọc (phase 1) | Phase 2–4 (I/O thật) |
 |---|---|---|---|
 | `antares-downloads` | downloads | state machine §103, checksum codes, dedup registry | **xong phase 2+3+4**: sha1/sha256 thuần → incremental hasher (Sha1Hasher/Sha256Hasher — streaming verify 256KB/block, `verify_file_streaming`); HTTP engine §102 thuần (GET/Range/206/chunked/redirect — Range không kế thừa) + **streaming `get_stream`** callback từng chunk 64KB + **TLS seam** `https_url_to_http` (https → fail rõ ràng tới khi bundle) ; `PartInfo` resume parity; pipeline `download()` parity `DownloadManager` retry 8 + backoff min(2n,8) — **attempt_once streaming** (ghi part từng chunk, restart 200≠206 đúng parity). Còn: TLS thật (bundle Batch 16) |
-| `antares-process` | process | record §113, cleanup policy, registry, sweep | **xong**: spawn/wait/stop thật (`std::process`), stdin prompt graceful → kill, stderr drain, exit→state. Còn: stdout/stderr pipeline §114 gộp dòng |
+| `antares-process` | process | record §113, cleanup policy, registry, sweep | **xong**: spawn/wait/stop thật (`std::process`, `CREATE_NO_WINDOW`), stdin prompt graceful → kill, exit→state; **LogMux** — merge stdout/stderr timestamp §114 (ring bounded §88) + scoped log file §115 |
 | `antares-java` | Java manager | model §110, resolve order, parse version | **xong phase 3**: `discovery` — scan known dirs theo OS + JAVA_HOME + PATH (resolve symlink, dedupe giữ thứ tự), `detect_major` qua `java -showversion` timeout 15s, `java_info`/`scan_java_infos`. Còn: Mojang runtime **download** (manifest đã có ở antares-net, runtime download ⏳) |
 | `antares-launch` | Minecraft launch | session §112, preflight, argument builder | **xong phase 2+3+4**: `JavaResolver` + `ArtifactResolver` §104; `planner` — `required_java_major` §108 + `plan_launch`; **`exit.rs`** — `ExitAnalyzer` §116 (ingest→normalize→fingerprint→classify→rank→recommendation, weak evidence → Unknown/confidence 0, không LLM) + `CompanionPairing` (ghi companion.json atomic parity `write_pairing_for_instance` — server off → None) |
 | `antares-net` | network | rtt_stats parity `_probe_stats`, PacketRing §122 | **xong phase 2+3+4**: ping §119 + `probe.rs` (tcp_check/probe/dns/endpoints); **`manifest.rs`** — Mojang manifest parity `ManifestService` + `DiskCache` TTL 30 phút `{ts,value}` + stale fallback offline (mục 60) + `download_size` (client + libraries artifact/classifiers + assetIndex). Còn: song song hoá endpoints khi có tokio |
@@ -55,9 +55,9 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 ### Process (legacy `infrastructure/process/manager.py`)
 - [x] ✅ Record pid/owner/instance/fingerprint/exit (§113) — `ProcessRecord`
 - [x] ✅ Cleanup policy Wait/Kill/Keep, không kill ngoài scope (§113) — `CleanupPolicy` + `shutdown_plan`
-- [x] ✅ Spawn/wait/stop thật: merge stderr drain, utf-8 lossy, stdin prompt graceful → wait timeout → kill, exit code → EXITED/Failed (phase 2, tests unix-gated)
-- [ ] ⏳ stdout/stderr pipeline gộp dòng theo timestamp (§114)
-- [ ] ⏳ Log storage (§115) — route vào LogsRoot scoped
+- [x] ✅ Spawn/wait/stop thật: stderr drain tagged, utf-8 lossy, stdin prompt graceful → wait timeout → kill, exit code → EXITED/Failed (phase 2; tests cross-platform — chạy cả Windows CI, gồm cwd space/unicode, `CREATE_NO_WINDOW`)
+- [x] ✅ stdout/stderr pipeline gộp dòng theo timestamp (§114) — `LogMux`: `timestamp_ms` + tag `stdout`/`stderr`, ring bounded drop-oldest (§88)
+- [x] ✅ Log storage (§115) — `LogMux::create_scoped(logs_root, scope)`: scope `[A-Za-z0-9._-]` chặn traversal (§50) → append `<logs_root>/<scope>.log` (caller truyền LogsRoot)
 
 ### Java manager (legacy `services/java/discovery.py` + `manager.py`)
 - [x] ✅ Model `JavaRuntime` (§110) — source/path/major/minor/arch/vendor/verified/capabilities
@@ -91,9 +91,9 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 ### Process (legacy `infrastructure/process/manager.py`)
 - [x] ✅ Record pid/owner/instance/fingerprint/exit (§113) — `ProcessRecord`
 - [x] ✅ Cleanup policy Wait/Kill/Keep, không kill ngoài scope (§113) — `CleanupPolicy` + `shutdown_plan`
-- [x] ✅ Spawn/wait/stop thật: merge stderr drain, utf-8 lossy, stdin prompt graceful → wait timeout → kill, exit code → EXITED/Failed (phase 2, tests unix-gated)
-- [ ] ⏳ stdout/stderr pipeline gộp dòng theo timestamp (§114)
-- [ ] ⏳ Log storage (§115) — route vào LogsRoot scoped
+- [x] ✅ Spawn/wait/stop thật: stderr drain tagged, utf-8 lossy, stdin prompt graceful → wait timeout → kill, exit code → EXITED/Failed (phase 2; tests cross-platform — chạy cả Windows CI, gồm cwd space/unicode, `CREATE_NO_WINDOW`)
+- [x] ✅ stdout/stderr pipeline gộp dòng theo timestamp (§114) — `LogMux`: `timestamp_ms` + tag `stdout`/`stderr`, ring bounded drop-oldest (§88)
+- [x] ✅ Log storage (§115) — `LogMux::create_scoped(logs_root, scope)`: scope `[A-Za-z0-9._-]` chặn traversal (§50) → append `<logs_root>/<scope>.log` (caller truyền LogsRoot)
 
 ### Java manager (legacy `services/java/discovery.py` + `manager.py`)
 - [x] ✅ Model `JavaRuntime` (§110) — source/path/major/minor/arch/vendor/verified/capabilities

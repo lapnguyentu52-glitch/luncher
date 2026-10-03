@@ -17,7 +17,8 @@ Cập nhật 2026-10-02 (không thay baseline lịch sử ở trên):
 
 ```text
 python -m pytest tests -q   → 484 passed   (481 cũ + 3 test spawn sidecar thật)
-cargo test --workspace      → 347+ passed  (15 crate, trừ antares-shell)
+cargo test --workspace      → 370+ passed  (15 crate, trừ antares-shell;
+                             2026-10-03: +LogMux, tests process cross-platform)
 pnpm test                   → 129 passed   (17 file)
 pnpm typecheck / pnpm lint  → 0 lỗi
 ```
@@ -578,15 +579,19 @@ Parity verify song song Python (chạy thật sidecar logic):
 - `rtt_stats()` — 5/5 case khớp `_probe_stats` (gồm float path 11.1−10.5=0.5999…)
 - `parse_java_version` — 4 format output `java -version` (gồm legacy 1.8→8)
 
-Phase 2 (đã làm — logic + I/O sync, tests unix-gated cho phần spawn/ping):
+Phase 2 (đã làm — logic + I/O sync, tests cross-platform cho phần spawn/ping):
 - `antares-downloads` +sha.rs: SHA-1/SHA-256 thuần Rust (test vector chuẩn "abc"/
   ""/multi-block), `verify_file` (code FILE_UNREADABLE mới cho file mất),
   `commit_artifact` atomic rename idempotent (target tồn tại → false + dọn tmp,
   không ghi đè shared immutable §104)
-- `antares-process` +spawn.rs: spawn thật qua std::process — stderr drain nền,
-  utf-8 lossy, `wait()` pump dòng + mark exit (0→Exited, khác→Failed), `stop()`
+- `antares-process` +spawn.rs: spawn thật qua std::process (Windows
+  `CREATE_NO_WINDOW`, cleanup policy do caller truyền) — `wait()` pump stdout +
+  mark exit (0→Exited, khác→Failed), stderr drain nền tagged vào LogMux, `stop()`
   stdin prompt graceful → poll try_wait timeout → kill (parity ProcessManager);
-  tests spawn/exit-3/stop-graceful/stop-kill unix-gated
+  +logmux.rs: merge stdout/stderr timestamp (§114) → ring bounded drop-oldest +
+  file scoped `<logs>/<scope>.log` (§115, chặn traversal §50);
+  tests spawn/exit-3/stop-graceful/stop-kill/cwd-space/cwd-unicode/stderr
+  cross-platform (chạy cả Windows CI)
 - `antares-net` +ping.rs: VarInt pack/read (số âm 5-byte, lỗi quá dài), frame/
   handshake builder, `parse_status` parity mc_ping (MOTD text + extra concat,
   players/version/modinfo/favicon, round 1 decimal), `ping()` TCP đọc đúng packet
