@@ -430,6 +430,20 @@ mod tests {
         let server = std::thread::spawn(move || {
             if let Ok((stream, _)) = listener.accept() {
                 let mut stream = stream;
+                // PHẢI đọc hết request trước khi trả lời: close socket khi vẫn còn
+                // byte request chưa đọc → RST (Windows/Linux) cắt luôn response client
+                // chưa đọc hết → attempt 1 fail → server single-accept đã thoát →
+                // retry chạm connection refused (os error 10061) → flaky CI.
+                let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+                let mut request_line = String::new();
+                let _ = reader.read_line(&mut request_line);
+                loop {
+                    let mut line = String::new();
+                    let _ = reader.read_line(&mut line);
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                }
                 let _ = stream.write_all(
                     format!(
                         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
