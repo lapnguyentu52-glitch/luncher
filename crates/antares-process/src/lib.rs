@@ -8,7 +8,7 @@ pub mod logmux;
 pub mod spawn;
 
 pub use logmux::{LogMux, LogRecord, LogStream};
-pub use spawn::{spawn, stop, wait, SpawnError, SpawnedProcess};
+pub use spawn::{spawn, spawn_with_secrets, stop, wait, wait_detached, SpawnError, SpawnedProcess};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

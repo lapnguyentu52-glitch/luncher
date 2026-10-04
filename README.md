@@ -108,3 +108,70 @@ Python (Batch 15).
   `instances_*` + UI `flowsCommands` bỏ `legacy_call` cho instances (các flow khác
   vẫn bridge đến Batch 06+); health/app đã có native từ trước (`app_ping`,
   `app_storage_info`, `legacy_status`, `legacy_shutdown`)
+- [x] no-Python Batch 06 — groups **accounts/java/versions/dashboard native**
+  (B15.2): `AccountStore` trong `antares-app` parity `accounts.*` (list strip
+  secret `token`/`_`-prefix, select → `AUTH_FAILED` "account not found: {id}") +
+  5 Tauri command `accounts_list/accounts_select/java_list/versions_list/
+  dashboard_summary` — contract sidecar giữ nguyên (PARITY evidence #3):
+  `{accounts}`, `{javas}`, `{versions}`, dashboard `{appVersion, instanceCount,
+  selectedInstanceId, recentInstanceId, recentInstanceName, account:{id,
+  displayName}, legacyAvailable}`; loader lạ → `VALIDATION_FAILED`, manifest
+  lỗi → `NETWORK_UNAVAILABLE`, `legacyAvailable = !rustOnly` + UI
+  `flowsCommands` bỏ `legacy_call` cho 5 flow này (preflight/launch còn bridge
+  đến Batch 07)
+- [x] no-Python Batch 07a — group **play.preflight native**: service
+  `AppServices::play_preflight` parity `handle_play_preflight` (đúng 5 check
+  java/version/account/disk/mods + thứ tự + detail; `required_java_major`
+  parity sidecar riêng rule với §108 planner; disk free native statvfs/
+  GetDiskFreeSpaceExW §14 — không psutil; thiếu instance → `INSTANCE_NOT_FOUND`
+  thêm cả 2 phía catalog) + Tauri command `play_preflight` + UI bỏ
+  `legacy_call` cho preflight — **play.launch vẫn bridge chờ Batch 07b**
+  (orchestrator native: version JSON → classpath → install pipeline → spawn)
+- [x] no-Python Batch 07b — **play.launch native** (orchestrator parity
+  `LaunchOrchestrator`): version JSON parser + rules parity MLL 8.0
+  (`mcjson.rs`) + command builder byte-for-byte (`command.rs` — **A/B golden**
+  `tests/mll_parity.rs` khớp `minecraft_launcher_lib.get_minecraft_command`
+  thật, script `tests/parity/gen_launch_command_golden.py`) + `JvmConfig`
+  parity jvm.py (GC auto/g1/balanced + `_low_end` probe native §14) +
+  ResourceLock parity locks.py (pid + stale steal) + natives extract
+  (zip/deflate qua antares-mods, chặn traversal §50) + spawn qua
+  `spawn_with_secrets` (token mask khỏi fingerprint §26) + LogMux scoped +
+  task LAUNCH (complete sau spawn) + `required_java_major` fix snapshot → 21 —
+  lệnh native chơi được instance vanilla ĐÃ cài (B07c đã nối install)
+- [x] no-Python Batch 07c — **install pipeline + loader fabric/forge**:
+  `antares-app::install` parity MLL (`install.py`/`fabric.py`/`forge.py`/
+  `_helper.inherit_json`): version json (manifest cache 30' + stale offline,
+  mã `MINECRAFT_VERSION_NOT_FOUND`) → libraries (rules/artifact/Maven parity
+  + natives extract, nuốt lỗi Maven optional như `try/except: pass`) →
+  assets content-addressed → logging → client jar (copy parent cho version
+  kế thừa); `inheritsFrom` merge (`inherit_json` + `resolve_version_json`)
+  trong `mcjson.rs`; **fabric** = fetch profile JSON thẳng từ meta
+  (`/v2/versions/loader/{mc}/{lv}/profile/json` — bỏ `java -jar` installer);
+  **forge** = installer jar → `install_profile.json` → profile libs → extract
+  `version.json`/universal/client.lzma → 6 processors client (parity var
+  `{VAR}` + unwrap `[maven]`, Main-Class từ MANIFEST, exit≠0 →
+  `LOADER_INSTALL_FAILED` — mạnh hơn MLL bỏ qua exit code; <1.13 → báo rõ
+  không tự động); `play_launch` **auto-install khi version chưa cài** (task
+  LAUNCH progress, parity orchestrator step 3) + command mới `play_install`
+  (task `INSTALL` chạy nền, contract `{taskId}`) + `versions_list` fabric
+  (stable MC) / forge (maven metadata); codes mới
+  `MINECRAFT_VERSION_NOT_FOUND`/`LOADER_INSTALL_FAILED` (cả 2 phía catalog)
+- [x] no-Python Batch 07d — **Mojang JRE runtime + profile launch hints**:
+  `antares-app::mojang_runtime` parity MLL `runtime.py` (manifest java-runtime
+  `2ec0cc96…all.json`, platform string theo OS/arch, tải **lzma ~2.9MB →
+  decompress + verify sha1 raw** parity `download_java_runtime` — lzma-rs;
+  file/dir/link manifest, `.version` + `{component}.sha1` sidecar, chmod +x,
+  symlink, path escape → `VALIDATION_FAILED`, component thiếu/platform trống →
+  `Ok(None)` nuốt như legacy) + `resolve_java_for` parity `_resolve_java` 3
+  bước (1 system → 2 probe runtime đã cài + `detect_major` → 3 cài Mojang
+  component theo `javaVersion.major`, source `JavaSource::Mojang`) +
+  **profile launch hints** parity `_profile_launch_overrides` (đọc
+  `config/profiles-state.json` key `launch` version 1 + instanceId guard →
+  server/port, quickPlay, customResolution 854×480 falsy-default) →
+  `LaunchHints` trong `antares-launch::command` (`--server/--port` sau game
+  args, `--width/--height` path `minecraftArguments` pre-1.13, feature rules
+  theo launch options parity `parse_single_rule` — library rules luôn
+  `options={}`) + fix step 6 `resolve_version_json` (fabric/forge
+  `inheritsFrom` không còn bị reject); codes dùng lại (không mới):
+  `JAVA_NOT_FOUND`/`OPEN_JAVA_SETTINGS`/`NETWORK_UNAVAILABLE`;
+  **deferred**: MINECRAFT_* events

@@ -75,6 +75,39 @@ pub fn spawn(
     mux: Option<Arc<LogMux>>,
     started_at_unix_ms: u64,
 ) -> Result<(String, SpawnedProcess, u32), SpawnError> {
+    spawn_inner(registry, owner, instance_id, program, args, cwd, cleanup, mux, started_at_unix_ms, &[])
+}
+
+/// §26 — spawn với `secrets`: các giá trị tuyệt đối không được ghi vào
+/// `command_fingerprint` (vd `--accessToken <token>` trong game args — record
+/// chỉ để debug, secret không bao giờ nằm trong log/record).
+pub fn spawn_with_secrets(
+    registry: &mut ProcessRegistry,
+    owner: &str,
+    instance_id: Option<String>,
+    program: &str,
+    args: &[String],
+    cwd: Option<&str>,
+    cleanup: CleanupPolicy,
+    mux: Option<Arc<LogMux>>,
+    started_at_unix_ms: u64,
+    secrets: &[String],
+) -> Result<(String, SpawnedProcess, u32), SpawnError> {
+    spawn_inner(registry, owner, instance_id, program, args, cwd, cleanup, mux, started_at_unix_ms, secrets)
+}
+
+fn spawn_inner(
+    registry: &mut ProcessRegistry,
+    owner: &str,
+    instance_id: Option<String>,
+    program: &str,
+    args: &[String],
+    cwd: Option<&str>,
+    cleanup: CleanupPolicy,
+    mux: Option<Arc<LogMux>>,
+    started_at_unix_ms: u64,
+    secrets: &[String],
+) -> Result<(String, SpawnedProcess, u32), SpawnError> {
     let mut command = Command::new(program);
     command
         .args(args)
@@ -98,10 +131,14 @@ pub fn spawn(
     })?;
     let pid = child.id();
     let stdin = child.stdin.take();
+    let mut fingerprint = format!("{program} {args:?}");
+    for secret in secrets.iter().filter(|s| !s.is_empty()) {
+        fingerprint = fingerprint.replace(secret.as_str(), "***");
+    }
     let id = registry.register(
         owner,
         instance_id,
-        format!("{program} {args:?}"),
+        fingerprint,
         cleanup,
         started_at_unix_ms,
     );
@@ -118,8 +155,30 @@ pub fn spawn(
 ///   (legacy `stderr=STDOUT` gộp mù); ring bounded drop-oldest + file scoped.
 pub fn wait(
     id: &str,
-    mut handle: SpawnedProcess,
+    handle: SpawnedProcess,
     registry: &mut ProcessRegistry,
+    on_line: Option<OnLine<'_>>,
+) -> std::io::Result<i32> {
+    let code = pump(handle, on_line)?;
+    let _ = registry.mark_exit(id, exit_state(code));
+    Ok(code)
+}
+
+/// Exit state theo code — parity wait(): 0 → Exited, còn lại → Failed.
+fn exit_state(code: i32) -> ExitState {
+    if code == 0 {
+        ExitState::Exited
+    } else {
+        ExitState::Failed
+    }
+}
+
+/// B07b — pump stdout/stderr (mux + callback) cho tới EOF rồi chờ exit.
+/// Tách khỏi `wait()` để `wait_detached` chạy game ở thread nền mà KHÔNG giữ
+/// `&mut ProcessRegistry` suốt vòng đời (game sống hàng giờ — mutex đó sẽ
+/// ghim mọi lệnh process khác).
+fn pump(
+    mut handle: SpawnedProcess,
     mut on_line: Option<OnLine<'_>>,
 ) -> std::io::Result<i32> {
     // Drop stdin trước để child thấy EOF nếu nó đọc stdin.
@@ -171,13 +230,19 @@ pub fn wait(
     }
     stderr_thread.join().expect("stderr drain thread");
 
-    let code = child.wait()?.code().unwrap_or(-1);
-    let state = if code == 0 {
-        ExitState::Exited
-    } else {
-        ExitState::Failed
-    };
-    let _ = registry.mark_exit(id, state);
+    Ok(child.wait()?.code().unwrap_or(-1))
+}
+
+/// B07b — pump log bằng thread nền cho process sống lâu (game): không giữ
+/// registry; khi process thoát gọi `on_exit(state, code)` để caller mark
+/// record §113 từ Arc/Mutex của chính nó.
+pub fn wait_detached(
+    handle: SpawnedProcess,
+    on_line: Option<OnLine<'_>>,
+    on_exit: impl FnOnce(ExitState, i32),
+) -> std::io::Result<i32> {
+    let code = pump(handle, on_line)?;
+    on_exit(exit_state(code), code);
     Ok(code)
 }
 
@@ -545,5 +610,74 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// §26 — secret (accessToken) không bao giờ nằm trong command fingerprint.
+    #[test]
+    fn spawn_with_secrets_masks_token_in_fingerprint() {
+        let mut reg = registry();
+        let (program, args) = shell_script("echo x", "echo x");
+        let mut full = args;
+        full.push("--accessToken".into());
+        full.push("s3cret-token-123".into());
+        let secrets = vec!["s3cret-token-123".to_string()];
+
+        let (id, handle, _pid) = spawn_with_secrets(
+            &mut reg,
+            "test",
+            None,
+            &program,
+            &full,
+            None,
+            CleanupPolicy::Wait,
+            None,
+            1_000,
+            &secrets,
+        )
+        .expect("spawn");
+
+        let record = reg.get(&id).expect("record");
+        assert!(
+            !record.command_fingerprint.contains("s3cret-token-123"),
+            "fingerprint không được chứa secret: {}",
+            record.command_fingerprint
+        );
+        assert!(record.command_fingerprint.contains("***"));
+        let _ = wait(&id, handle, &mut reg, None);
+    }
+
+    /// B07b — wait_detached: pump log + báo exit qua callback, KHÔNG mark registry
+    /// (caller thread nền tự mark từ Arc/Mutex của nó).
+    #[test]
+    fn wait_detached_pumps_and_reports_exit_without_registry() {
+        let mut reg = registry();
+        let (program, args) = shell_script("echo detached-ok", "echo detached-ok");
+        let (id, handle, _pid) = spawn(
+            &mut reg,
+            "test",
+            None,
+            &program,
+            &args,
+            None,
+            CleanupPolicy::Wait,
+            None,
+            1_000,
+        )
+        .expect("spawn");
+
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let sink = seen.clone();
+        let mut lines: Vec<String> = Vec::new();
+        let code = wait_detached(handle, Some(&mut |line: &str| lines.push(line.to_string())), move |state, code| {
+            *sink.lock().unwrap() = Some((state, code));
+        })
+        .expect("detached wait");
+
+        assert_eq!(code, 0);
+        assert_eq!(*seen.lock().unwrap(), Some((ExitState::Exited, 0)));
+        assert_eq!(lines.join("\n").trim(), "detached-ok");
+        // detached KHÔNG tự mark — registry vẫn Running cho tới khi caller mark.
+        assert_eq!(reg.get(&id).expect("record").exit_state, ExitState::Running);
+        assert!(reg.mark_exit(&id, ExitState::Exited).expect("mark"));
     }
 }

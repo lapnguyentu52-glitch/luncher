@@ -52,6 +52,10 @@ pub struct VersionEntry {
     pub release_time: String,
     #[serde(default)]
     pub url: String,
+    /// Batch 07c — sha1 của version JSON (manifest v2 có sẵn) để
+    /// `download_file(..., sha1=)` parity MLL `do_version_install`.
+    #[serde(default)]
+    pub sha1: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -69,6 +73,8 @@ struct RawEntry {
     release_time: String,
     #[serde(default)]
     url: String,
+    #[serde(default)]
+    sha1: String,
 }
 
 impl From<RawEntry> for VersionEntry {
@@ -78,6 +84,7 @@ impl From<RawEntry> for VersionEntry {
             r#type: raw.kind,
             release_time: raw.release_time,
             url: raw.url,
+            sha1: raw.sha1,
         }
     }
 }
@@ -287,6 +294,7 @@ mod tests {
             r#type: "release".into(),
             release_time: "2024-12-03T10:15:27+00:00".into(),
             url: "https://piston-meta.mojang.com/v1/packages/…/1.21.4.json".into(),
+            sha1: "abc".into(),
         }];
         cache.put("mojang_manifest", &versions);
 
@@ -319,7 +327,7 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let payload = serde_json::json!({
             "ts": 0.0,
-            "value": [{"id": "1.12.2", "type": "release", "releaseTime": "2017", "url": ""}],
+            "value": [{"id": "1.12.2", "type": "release", "releaseTime": "2017", "url": "", "sha1": ""}],
         });
         std::fs::write(&path, payload.to_string()).unwrap();
 
@@ -340,7 +348,8 @@ mod tests {
             "versions": [
                 {"id": "1.21.4", "type": "release",
                  "releaseTime": "2024-12-03T10:15:27+00:00",
-                 "url": "https://piston-meta.mojang.com/v1/packages/x/1.21.4.json"},
+                 "url": "https://piston-meta.mojang.com/v1/packages/x/1.21.4.json",
+                 "sha1": "deadbeef"},
                 {"id": "b1.7.3", "type": "old_beta", "releaseTime": "2011", "url": ""},
             ]
         });
@@ -392,7 +401,7 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let payload = serde_json::json!({
             "ts": 0.0,
-            "value": [{"id": "1.20.1", "type": "release", "releaseTime": "2023", "url": ""}],
+            "value": [{"id": "1.20.1", "type": "release", "releaseTime": "2023", "url": "", "sha1": ""}],
         });
         std::fs::write(&path, payload.to_string()).unwrap();
 

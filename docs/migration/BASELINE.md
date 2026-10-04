@@ -810,6 +810,8 @@ B15.1f PARITY:     + golden A/B fixtures: tests/parity/gen_visuals_golden.py sin
 Cần crate mới:     0 — B15.1 ĐỦ 6 crate (a–f); defer: resource.* 18 method +
                    visual export 3 (project store/builder/installer phase sau)
                    + phần còn lại của mods
-Cần wiring:        instances(4) accounts(2) dashboard(1) health/app(5) + phần
-                   runtime/packet/play/profiles chưa nối
+Cần wiring:        profiles capture/plan/apply/revert + runtime/packet chưa
+                   nối (instances/accounts/java/versions/dashboard/play đã
+                   native B15.2/B07a/B07b — xem PARITY.md) + health/app(5)
+                   method lẻ (app.echo chưa chứng minh dead-legacy)
 ```

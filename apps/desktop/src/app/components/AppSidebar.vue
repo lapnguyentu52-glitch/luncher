@@ -51,6 +51,19 @@ function hideTip(): void {
   tip.value = null
 }
 onBeforeUnmount(hideTip)
+
+/* Điều hướng bàn phím: ↑/↓ chuyển focus giữa các mục (vòng tròn) */
+function onListKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+  const links = Array.from(
+    (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('.sidebar__link'),
+  )
+  const i = links.indexOf(document.activeElement as HTMLElement)
+  if (i < 0) return
+  e.preventDefault()
+  const n = links.length
+  links[e.key === 'ArrowDown' ? (i + 1) % n : (i - 1 + n) % n]?.focus()
+}
 </script>
 
 <template>
@@ -105,6 +118,7 @@ onBeforeUnmount(hideTip)
       class="sidebar__list"
       :style="{ '--idx': Math.max(activeIndex, 0) }"
       @scroll.passive="hideTip"
+      @keydown="onListKeydown"
     >
       <!-- Một indicator duy nhất, trượt tới mục đang active -->
       <li
@@ -117,13 +131,14 @@ onBeforeUnmount(hideTip)
         v-for="(item, i) in NAV_ITEMS"
         :key="item.id"
         class="sidebar__li"
-        :style="{ '--stagger': `${i * 35}ms` }"
+        :style="{ '--stagger': `${Math.min(i, 10) * 28}ms` }"
       >
         <RouterLink
           :to="item.path"
           class="sidebar__link"
           :class="{ 'sidebar__link--active': route.name === item.id }"
           :aria-label="t(`nav.${item.id}`)"
+          :aria-current="route.name === item.id ? 'page' : undefined"
           @mouseenter="showTip($event, item.id)"
           @focus="showTip($event, item.id)"
           @mouseleave="hideTip"
@@ -197,22 +212,28 @@ onBeforeUnmount(hideTip)
   --item-h: 40px;
   --item-gap: 4px;
   --list-pad: 8px;
+  /* Tông accent suy ra từ var(--accent) → đổi accent / customAccent trong Settings vẫn đúng màu */
+  --a-line: color-mix(in srgb, var(--accent) 38%, transparent);
+  --a-wash: color-mix(in srgb, var(--accent) 9%, transparent);
 
   width: var(--sidebar-w, 232px);
   display: flex;
   flex-direction: column;
   border: none;
   border-right: 1px solid rgba(255, 255, 255, 0.03);
-  background: var(--neu-surface);
+  background:
+    radial-gradient(220px 160px at 0% 0%, var(--a-wash), transparent 70%),
+    var(--neu-surface);
   box-shadow:
     6px 0 16px var(--neu-dark),
     inset -1px 0 0 var(--neu-light);
-  /* Không overshoot trên width → không giật layout bên phải */
-  transition: width 380ms var(--ease-out);
+  /* Nhanh hơn (280ms): đủ mượt, cảm giác phản hồi tức thì */
+  transition: width 280ms var(--ease-out);
   position: relative;
   z-index: 1;
   overflow: hidden;
   will-change: width;
+  contain: layout paint style;
 }
 .sidebar--compact {
   width: 70px;
@@ -226,7 +247,7 @@ onBeforeUnmount(hideTip)
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  background: linear-gradient(90deg, transparent, var(--a-line), transparent);
   pointer-events: none;
 }
 
@@ -257,7 +278,7 @@ onBeforeUnmount(hideTip)
     inset 0 1px 0 var(--glass-highlight);
   flex-shrink: 0;
   position: relative;
-  transition: transform 420ms var(--spring);
+  transition: transform 300ms var(--spring);
 }
 .sidebar:hover .sidebar__logo {
   transform: rotate(-6deg) scale(1.06);
@@ -295,19 +316,18 @@ onBeforeUnmount(hideTip)
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.24em;
-  color: var(--text-2);
   white-space: nowrap;
-  background: linear-gradient(180deg, var(--text-1), var(--text-3));
+  background: linear-gradient(100deg, var(--text-1) 40%, var(--accent) 140%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 .brand-enter-active {
-  transition: opacity 260ms ease 160ms, transform 320ms var(--ease-out) 160ms;
+  transition: opacity 200ms ease 100ms, transform 260ms var(--ease-out) 100ms;
 }
 .brand-leave-active {
   position: absolute;
-  transition: opacity 100ms ease;
+  transition: opacity 80ms ease;
 }
 .brand-enter-from,
 .brand-leave-to {
@@ -328,31 +348,35 @@ onBeforeUnmount(hideTip)
   color: var(--text-3);
   border-radius: 50%;
   cursor: pointer;
+  outline: none;
   box-shadow:
     2px 2px 6px var(--neu-dark),
     -2px -2px 6px var(--neu-light);
   transition:
     box-shadow var(--motion-instant) ease,
     color var(--motion-fast) ease,
-    transform 200ms var(--spring);
+    transform 160ms var(--spring);
 }
 .sidebar--compact .sidebar__toggle {
   margin-left: 0;
 }
 .sidebar__toggle:hover {
   color: var(--accent);
-  transform: scale(1.08);
+  transform: scale(1.1);
 }
 .sidebar__toggle:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
   box-shadow:
     inset 3px 3px 6px var(--neu-dark-strong),
     inset -3px -3px 6px var(--neu-light);
 }
+.sidebar__toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-glow), 0 0 0 1px var(--accent) inset;
+}
 .sidebar__toggle-icon {
   width: 14px;
   height: 14px;
-  transition: transform 420ms var(--spring);
+  transition: transform 320ms var(--spring);
 }
 
 /* ───────── List ───────── */
@@ -368,12 +392,13 @@ onBeforeUnmount(hideTip)
   overflow-x: hidden;
   position: relative;
   scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 .sidebar__list::-webkit-scrollbar {
   display: none;
 }
 
-/* Indicator trượt: inset pill + rail phát sáng */
+/* Indicator trượt: inset pill nhuốm màu accent + rail phát sáng */
 .sidebar__indicator {
   position: absolute;
   top: var(--list-pad);
@@ -381,7 +406,9 @@ onBeforeUnmount(hideTip)
   right: var(--list-pad);
   height: var(--item-h);
   border-radius: var(--radius-md);
-  background: var(--neu-surface-inset);
+  background:
+    linear-gradient(90deg, var(--a-wash), transparent 75%),
+    var(--neu-surface-inset);
   border: 1px solid rgba(0, 0, 0, 0.18);
   box-shadow:
     inset 3px 3px 8px var(--neu-dark-strong),
@@ -389,9 +416,11 @@ onBeforeUnmount(hideTip)
   transform: translateY(calc(var(--idx, 0) * (var(--item-h) + var(--item-gap))));
   opacity: 0;
   pointer-events: none;
+  will-change: transform;
+  /* Trượt nhanh hơn, vẫn có độ nảy nhẹ */
   transition:
-    transform 460ms var(--spring),
-    opacity 200ms ease;
+    transform 340ms var(--spring),
+    opacity 160ms ease;
   list-style: none;
 }
 .sidebar__indicator--on {
@@ -405,7 +434,7 @@ onBeforeUnmount(hideTip)
   width: 3px;
   height: 56%;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, var(--accent), rgba(255, 92, 71, 0.4));
+  background: linear-gradient(180deg, var(--accent), var(--a-line));
   box-shadow: 0 0 12px var(--accent-glow);
   transform: translateY(-50%);
 }
@@ -416,7 +445,7 @@ onBeforeUnmount(hideTip)
 .sidebar__li {
   position: relative;
   z-index: 1;
-  animation: li-in 480ms var(--ease-out) both;
+  animation: li-in 360ms var(--ease-out) both;
   animation-delay: var(--stagger, 0ms);
 }
 @keyframes li-in {
@@ -441,11 +470,12 @@ onBeforeUnmount(hideTip)
   background: transparent;
   overflow: hidden;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
   transition:
-    background var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease,
-    color var(--motion-fast) ease,
-    transform 160ms var(--ease-out);
+    background 100ms ease,
+    box-shadow 100ms ease,
+    color 100ms ease,
+    transform 120ms var(--ease-out);
 }
 /* Sheen quét ngang khi hover (transform-only) */
 .sidebar__link::after {
@@ -453,9 +483,9 @@ onBeforeUnmount(hideTip)
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.06) 50%, transparent 65%);
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.07) 50%, transparent 65%);
   transform: translateX(-130%);
-  transition: transform 700ms var(--ease-out);
+  transition: transform 560ms var(--ease-out);
 }
 .sidebar__link:hover::after {
   transform: translateX(130%);
@@ -468,13 +498,13 @@ onBeforeUnmount(hideTip)
     -2px -2px 6px var(--neu-light);
 }
 .sidebar__link:active {
-  transform: scale(0.97);
+  transform: scale(0.965);
 }
 .sidebar__link:focus-visible {
   box-shadow: 0 0 0 2px var(--accent-glow), 0 0 0 1px var(--accent) inset;
 }
 .sidebar__link--active {
-  color: var(--text-1);
+  color: var(--text-0, var(--text-1));
 }
 
 .sidebar__icon {
@@ -482,9 +512,9 @@ onBeforeUnmount(hideTip)
   height: 19px;
   flex-shrink: 0;
   transition:
-    transform 320ms var(--spring),
-    filter var(--motion-fast) ease,
-    color var(--motion-fast) ease;
+    transform 240ms var(--spring),
+    filter 100ms ease,
+    color 100ms ease;
 }
 .sidebar__link:hover .sidebar__icon {
   transform: scale(1.14) rotate(-5deg);
@@ -502,10 +532,10 @@ onBeforeUnmount(hideTip)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Mở rộng: chữ hiện SAU khi width đã nới ra một chút */
+  /* Mở rộng: chữ hiện ngay sau khi width bắt đầu nới */
   transition:
-    opacity 220ms ease 140ms,
-    transform 320ms var(--ease-out) 140ms;
+    opacity 180ms ease 90ms,
+    transform 240ms var(--ease-out) 90ms;
 }
 .sidebar__link--active .sidebar__label {
   font-weight: 600;
@@ -516,24 +546,24 @@ onBeforeUnmount(hideTip)
   pointer-events: none;
   /* Thu gọn: chữ biến mất ngay lập tức */
   transition-delay: 0s;
-  transition-duration: 90ms;
+  transition-duration: 70ms;
 }
 
 /* ───────── Tooltip (fixed) ───────── */
 .sidebar__tooltip {
   position: fixed;
   transform: translateY(-50%);
-  background: #14171f;
-  border: 1px solid #3a414f;
+  background: var(--neu-surface, #14171f);
+  border: 1px solid var(--a-line);
   color: var(--text-1);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 5px 11px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
   pointer-events: none;
   z-index: 60;
-  box-shadow: 0 8px 20px var(--neu-dark);
+  box-shadow: 0 8px 20px var(--neu-dark), 0 0 14px -4px var(--accent-glow);
 }
 .sidebar__tooltip::before {
   content: '';
@@ -542,14 +572,14 @@ onBeforeUnmount(hideTip)
   top: 50%;
   width: 7px;
   height: 7px;
-  background: #14171f;
-  border-left: 1px solid #3a414f;
-  border-bottom: 1px solid #3a414f;
+  background: var(--neu-surface, #14171f);
+  border-left: 1px solid var(--a-line);
+  border-bottom: 1px solid var(--a-line);
   transform: translateY(-50%) rotate(45deg);
 }
 .pop-enter-active,
 .pop-leave-active {
-  transition: opacity 140ms ease, transform 200ms var(--ease-out);
+  transition: opacity 100ms ease, transform 160ms var(--ease-out);
 }
 .pop-enter-from,
 .pop-leave-to {
@@ -580,9 +610,9 @@ onBeforeUnmount(hideTip)
   height: calc(100% - 6px);
   border-radius: 999px;
   background: var(--accent-soft);
-  border: 1px solid rgba(255, 92, 71, 0.35);
+  border: 1px solid var(--a-line);
   box-shadow: 0 0 10px var(--accent-glow);
-  transition: transform 340ms var(--spring);
+  transition: transform 260ms var(--spring);
 }
 .sidebar__lang-thumb--en {
   transform: translateX(var(--seg-w));
@@ -600,16 +630,24 @@ onBeforeUnmount(hideTip)
   border-radius: 999px;
   cursor: pointer;
   outline: none;
-  transition: color var(--motion-fast) ease;
+  transition: color 100ms ease, transform 120ms var(--spring);
 }
 .sidebar__lang-btn:hover {
   color: var(--text-1);
+}
+.sidebar__lang-btn:active {
+  transform: scale(0.9);
 }
 .sidebar__lang-btn--on {
   color: var(--accent);
 }
 .sidebar__lang-btn:focus-visible {
   box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* Sidebar compact: switcher xếp dọc cho vừa 70px */
+.sidebar--compact .sidebar__lang {
+  --seg-w: 24px;
 }
 
 /* ───────── Reduced motion ───────── */

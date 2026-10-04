@@ -1,524 +1,273 @@
 /* ============================================================
-   Layout — app shell, sidebar, topbar, content, statusbar
-   (spec mục 186 Sidebar, 187 Topbar, 328 breakpoints)
+   Layout PREMIUM — lớp nâng cấp đặt SAU layout.css
+   Thứ tự nạp: base → components → components.premium → layout → layout.premium → animations
+   Gồm: sửa lỗi tooltip sidebar bị cắt, nâng cấp sidebar/topbar/statusbar/splash,
+        thêm page-head, grid helpers, promo card, balance pill cho trang seller.
    ============================================================ */
 
-#app {
-  position: relative;
-  z-index: var(--z-content);
-  display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-  height: 100vh;
-  padding-bottom: var(--statusbar-h);
-  transition: grid-template-columns var(--motion-normal) var(--ease-out);
-}
-
-#app.sidebar-collapsed {
-  grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
-}
-
-/* Cửa sổ hẹp (900-1279): sidebar gọn hơn nhưng toggle vẫn hoạt động (spec 328) */
-@media (max-width: 999px) {
-  #app { --sidebar-w: 196px; }
-}
+/* ---------- Khung app: dvh để không lệch trên màn hình có thanh trình duyệt ---------- */
+#app { height: 100vh; height: 100dvh; }
 
 /* ============================ SIDEBAR ============================ */
 #sidebar {
-  position: relative;
-  z-index: var(--z-sidebar);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .022), transparent 220px),
+    radial-gradient(260px 180px at 0% 0%, color-mix(in srgb, var(--accent-0) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, .03), transparent 240px),
     var(--bg-1);
-  border-right: 1px solid var(--border-0);
-  overflow: hidden;
 }
 
-#sidebar::after {
-  content: "";
-  position: absolute;
-  top: 0; right: -1px; bottom: 0;
-  width: 1px;
-  background: linear-gradient(180deg, var(--accent-soft), transparent 42%);
-  pointer-events: none;
-}
-
-/* ---- Logo / head ---- */
-.sidebar-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  min-height: var(--topbar-h);
-}
-
-#sidebar .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  font-size: var(--fs-lg);
-  font-weight: var(--weight-bold);
-  letter-spacing: .2px;
-  white-space: nowrap;
-}
-
+/* Logo: highlight kính + ánh sáng quét khi hover */
 #sidebar .logo .logo-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  border-radius: 11px;
-  background: var(--accent-gradient);
-  color: #180b08;
-  box-shadow: var(--accent-glow);
-}
-
-#sidebar .logo .logo-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-#sidebar .logo .logo-text small {
-  color: var(--text-3);
-  font-size: 9.5px;
-  font-weight: var(--weight-medium);
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
-}
-
-/* ---- Nav ---- */
-.sidebar-nav {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: var(--space-2) var(--space-3) var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-#sidebar .group-label {
-  color: var(--text-3);
-  font-size: 9.5px;
-  font-weight: var(--weight-bold);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  padding: var(--space-4) var(--space-3) var(--space-1);
-  white-space: nowrap;
-  transition: opacity var(--motion-fast);
-}
-
-.sidebar-nav > .group-label:first-child { padding-top: var(--space-2); }
-
-.nav-item {
   position: relative;
+  overflow: hidden;
+  box-shadow: var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -3px 6px rgba(0, 0, 0, .18);
+}
+#sidebar .logo .logo-mark::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 0; width: 55%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .5), transparent);
+  transform: translateX(-140%) skewX(-20deg);
+}
+#sidebar .logo:hover .logo-mark::after { animation: sheen .9s var(--ease-soft); }
+
+/* Nhãn nhóm: có đường kẻ mờ dần phía sau */
+#sidebar .group-label {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 9px var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: var(--text-1);
-  border: 1px solid transparent;
-  font-size: var(--fs-md);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  transition:
-    background var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out),
-    border-color var(--motion-fast) var(--ease-out);
+  gap: 8px;
+}
+#sidebar .group-label::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-1), transparent);
 }
 
-.nav-item .nav-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: inherit;
-  opacity: .85;
-  transition: opacity var(--motion-fast), transform var(--motion-normal) var(--ease-spring),
-    background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
-}
+/* Nav item */
+.nav-item { transition-timing-function: var(--ease-soft); }
+.nav-item .nav-label { transition: transform var(--motion-fast) var(--ease-soft); }
+.nav-item:hover .nav-label { transform: translateX(2px); }
 
-/* UIX v3: icon trong ô tile — active/hover nổi rõ, dễ scan tab */
-.nav-item:hover .nav-icon {
-  background: var(--bg-hover);
-  transform: translateY(-1px);
+/* Active: nền gradient + icon tile đặc màu accent, phát sáng */
+.nav-item.active {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-0) 18%, transparent), rgba(255, 255, 255, .02) 70%);
+  box-shadow: 0 8px 22px -16px var(--accent-ring);
 }
 .nav-item.active .nav-icon {
-  background: var(--accent-soft);
-  color: var(--accent-0);
-  box-shadow: inset 0 0 0 1px var(--accent-ring);
-  opacity: 1;
-}
-
-.nav-item .nav-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nav-item .nav-kbd {
-  margin-left: auto;
-  opacity: 0;
-  transform: translateX(4px);
-  transition: opacity var(--motion-fast), transform var(--motion-fast);
-}
-
-/* Badge đếm (vd. số dòng log mới trên nav Logs) — ẩn khi = 0 hoặc đang ở tab đó */
-.nav-badge {
-  margin-left: auto;
-  min-width: 17px;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-0);
-  color: #180b08;
-  font-size: 9px;
-  font-weight: var(--weight-bold);
-  line-height: 16px;
-  text-align: center;
-  flex-shrink: 0;
-}
-/* Có kbd thì badge co lại thành chấm, không chèn giữa badge và mép phải */
-.nav-item .nav-badge + .nav-kbd { margin-left: 6px; }
-.nav-item.active .nav-badge { background: var(--accent-0); }
-
-/* Sidebar thu gọn: badge thành chấm nổi góc icon (tooltip vẫn đọc được số) */
-#app.sidebar-collapsed .nav-badge {
-  position: absolute;
-  top: 5px;
-  right: 4px;
-  margin: 0;
-  min-width: 8px;
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  font-size: 0;
-  line-height: 0;
-}
-
-.nav-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-0);
-}
-
-.nav-item:hover .nav-icon { opacity: 1; transform: translateY(-1px); }
-.nav-item:hover .nav-kbd { opacity: .65; transform: none; }
-
-.nav-item:active { background: var(--bg-active); }
-
-.nav-item.active {
-  background: linear-gradient(90deg, var(--accent-soft), rgba(255, 255, 255, .03));
-  color: var(--text-0);
-  border-color: var(--border-0);
-}
-
-.nav-item.active .nav-icon { opacity: 1; color: var(--accent-0); }
-
-/* (icon tile style đã nâng cấp ở block trên — giữ selector cũ để không phá view khác) */
-
-/* Vạch accent bên trái khi active */
-.nav-item.active::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 50%;
-  width: 3px;
-  height: 22px;
-  border-radius: 0 3px 3px 0;
   background: var(--accent-gradient);
-  box-shadow: 0 0 12px var(--accent-ring);
-  transform: translateY(-50%);
+  color: #180b08;
+  opacity: 1;
+  box-shadow: 0 6px 16px -6px var(--accent-ring), inset 0 1px 0 rgba(255, 255, 255, .45);
 }
+.nav-item.active .nav-label { font-weight: var(--weight-bold); }
+
+/* Badge đếm: gradient + nảy khi xuất hiện */
+.nav-badge {
+  background: var(--accent-gradient);
+  box-shadow: 0 4px 10px -3px var(--accent-ring);
+  animation: pop .5s var(--ease-out) both;
+}
+
+/* Item đặc biệt: <a class="nav-item nav-pro"> — nổi bật vàng/VIP */
+.nav-item.nav-pro .nav-icon { color: var(--gold-0, #fbbf24); }
+.nav-item.nav-pro .nav-label { background: var(--gold-gradient, linear-gradient(135deg, #fde68a, #f59e0b)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: var(--weight-bold); }
+
+/* ---- FIX: tooltip sidebar thu gọn bị cắt bởi overflow:hidden ----
+   .sidebar-nav có overflow-x:hidden (→ overflow-y auto) nên ::after left:100% bị clip.
+   Khi thu gọn và cửa sổ đủ cao: cho phép tràn ra ngoài để tooltip hiện đủ. */
+@media (min-height: 720px) {
+  #app.sidebar-collapsed #sidebar,
+  #app.sidebar-collapsed .sidebar-nav { overflow: visible; }
+}
+#app.sidebar-collapsed .nav-item::after { box-shadow: var(--shadow-3); }
 
 /* ---- Sidebar footer ---- */
-.sidebar-foot {
-  flex: 0 0 auto;
-  border-top: 1px solid var(--border-0);
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.sb-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  border: 1px solid var(--border-0);
-  min-width: 0;
-}
-
-.sb-status .sb-avatar {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-4);
-  color: var(--text-1);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-bold);
-  overflow: hidden;
-}
-
-.sb-status .sb-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.sb-status .sb-meta b { font-size: var(--fs-sm); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-status .sb-meta span { font-size: var(--fs-xs); color: var(--text-3); }
-
-/* ---- Trạng thái thu gọn ---- */
-#app.sidebar-collapsed .sidebar-head { padding-inline: 0; justify-content: center; }
-#app.sidebar-collapsed #sidebar .logo-text,
-#app.sidebar-collapsed .nav-label,
-#app.sidebar-collapsed .nav-kbd,
-#app.sidebar-collapsed .group-label { display: none; }
-#app.sidebar-collapsed .sidebar-nav { padding-inline: var(--space-2); align-items: center; }
-#app.sidebar-collapsed .nav-item {
-  width: 46px;
-  height: 42px;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-}
-#app.sidebar-collapsed .nav-item .nav-icon { width: 22px; height: 22px; opacity: .95; }
-#app.sidebar-collapsed .sb-status { justify-content: center; padding: 8px 6px; }
-#app.sidebar-collapsed .sb-status .sb-meta { display: none; }
-#app.sidebar-collapsed .sidebar-foot { align-items: center; }
-
-/* Tooltip cho sidebar thu gọn (thuần CSS, không layout shift) */
-#app.sidebar-collapsed .nav-item::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%) translateX(-6px) scale(.96);
-  transform-origin: left center;
-  padding: 5px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-4);
-  border: 1px solid var(--border-1);
-  color: var(--text-0);
-  font-size: var(--fs-sm);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  box-shadow: var(--shadow-2);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast), transform var(--motion-fast) var(--ease-out);
-  z-index: var(--z-tooltip);
-}
-
-#app.sidebar-collapsed .nav-item:hover::after {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0) scale(1);
-}
-
-/* ============================ WORKSPACE ============================ */
-.workspace {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  position: relative;
-}
-
-/* ---- Topbar ---- */
-.topbar {
-  position: relative;
-  z-index: var(--z-topbar);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: var(--topbar-h);
-  flex: 0 0 var(--topbar-h);
-  padding: 0 var(--space-5);
-  background: var(--glass);
-  backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
-  border-bottom: 1px solid var(--border-0);
-  box-shadow: 0 1px 0 transparent;
-  transition: box-shadow var(--motion-normal), border-color var(--motion-normal);
-}
-
-/* Nội dung cuộn xuống -> topbar nổi nhẹ lên trên (đặt bởi app/bootstrap.js) */
-.topbar.scrolled {
-  border-bottom-color: var(--border-1);
-  box-shadow: var(--shadow-2);
-}
-
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  font-size: var(--fs-md);
-}
-.crumbs .crumb-group {
-  color: var(--text-3);
-  font-size: var(--fs-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
-}
-.crumbs .crumb-sep { color: var(--text-3); opacity: .6; }
-.crumbs .crumb-current {
-  color: var(--text-0);
-  font-weight: var(--weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* UIX v3: breadcrumb pill — vị trí hiện tại luôn thấy rõ trên topbar */
-.crumbs .crumb-current {
-  padding: 4px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-3);
-  border: 1px solid var(--border-0);
-  box-shadow: var(--shadow-inset);
-}
-
-.topbar-spacer { flex: 1 1 auto; }
-
-.search-trigger {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 210px;
-  padding: 7px 10px 7px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-0);
-  background: var(--bg-2);
-  color: var(--text-2);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
-}
-.search-trigger:hover { border-color: var(--border-1); background: var(--bg-3); color: var(--text-1); }
-.search-trigger .grow { text-align: left; }
-.search-trigger kbd { margin-left: auto; }
-
-.net-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-2);
-  border: 1px solid var(--border-0);
-  font-size: var(--fs-xs);
-  color: var(--text-2);
-}
-.net-pill .net-dot {
-  width: 6px;
-  height: 6px;
+.sb-status { background: linear-gradient(180deg, var(--bg-3), var(--bg-2)); box-shadow: var(--shadow-inset); }
+.sb-status .sb-avatar { position: relative; background: var(--accent-gradient); color: #180b08; }
+.sb-status .sb-avatar::after {          /* chấm online */
+  content: "";
+  position: absolute; right: -2px; bottom: -2px;
+  width: 9px; height: 9px;
   border-radius: 50%;
   background: var(--success);
-  box-shadow: 0 0 0 3px var(--success-soft);
-}
-.net-pill.offline .net-dot { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
-
-/* ---- Content ---- */
-#content {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: var(--space-6) var(--space-8) var(--space-10);
-  scroll-behavior: smooth;
+  border: 2px solid var(--bg-2);
 }
 
-#content > .view {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  animation: view-enter var(--motion-normal) var(--ease-out) both;
-  /* UX-3: view rời màn hình không tốn render (MDN CSS perf) */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 720px;
-}
-
-/* ---- Statusbar ---- */
-#statusbar {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  z-index: var(--z-statusbar);
-  height: var(--statusbar-h);
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 0 var(--space-4);
-  background: var(--glass-strong);
-  backdrop-filter: blur(var(--blur-glass));
-  border-top: 1px solid var(--border-0);
-  font-size: var(--fs-xs);
-  color: var(--text-2);
-  user-select: none;
-}
-#statusbar .sb-seg { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-#statusbar .dot { color: var(--success); font-size: 9px; }
-#statusbar .dot.offline { color: var(--danger); }
-#statusbar .sb-spacer { flex: 1 1 auto; }
-#statusbar .sb-sep { color: var(--text-3); opacity: .5; }
-#statusbar .sb-brand { color: var(--text-3); }
-
-/* ---- Splash (ẩn sau khi bootstrap xong) ---- */
-#splash {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-splash);
-  display: grid;
-  place-items: center;
-  gap: var(--space-4);
+/* Thẻ quảng bá nâng cấp (seller): <div class="sidebar-promo">…</div> */
+.sidebar-promo {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-ring);
   background:
-    radial-gradient(700px 420px at 50% 30%, rgba(255, 92, 71, .16), transparent 65%),
-    var(--bg-0);
-  transition: opacity var(--motion-slow) var(--ease-out), visibility var(--motion-slow);
+    radial-gradient(180px 90px at 100% 0%, rgba(160, 107, 255, .32), transparent 70%),
+    radial-gradient(160px 90px at 0% 100%, color-mix(in srgb, var(--accent-0) 28%, transparent), transparent 70%),
+    var(--bg-2);
 }
-#splash[hidden] { display: grid; opacity: 0; visibility: hidden; pointer-events: none; }
+.sidebar-promo b { display: block; font-size: var(--fs-md); }
+.sidebar-promo p { margin: 3px 0 10px; color: var(--text-2); font-size: var(--fs-xs); line-height: 1.45; }
+.sidebar-promo .btn { width: 100%; }
+#app.sidebar-collapsed .sidebar-promo { display: none; }
 
-/* Boot watchdog: boot fail -> splash ngừng nhấp nháy + hiện lỗi (UX: không treo vĩnh viễn) */
-#splash.boot-stuck .splash-mark { animation: none; opacity: .35; }
-#splash .splash-inner { display: grid; justify-items: center; gap: var(--space-4); }
-#splash .splash-mark {
-  display: grid;
-  place-items: center;
-  width: 74px;
-  height: 74px;
-  border-radius: var(--radius-xl);
+/* ============================ TOPBAR ============================ */
+.topbar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .03), transparent),
+    var(--glass);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.5);
+}
+.topbar::after {                         /* hairline gradient dưới topbar */
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-ring), transparent);
+  opacity: 0;
+  transition: opacity var(--motion-normal);
+  pointer-events: none;
+}
+.topbar.scrolled::after { opacity: .9; }
+
+.crumbs .crumb-current { box-shadow: var(--shadow-inset), 0 6px 16px -12px rgba(0, 0, 0, .6); }
+
+/* Ô tìm kiếm: sáng lên khi hover/focus */
+.search-trigger { box-shadow: var(--shadow-inset); transition-property: border-color, background, color, box-shadow, transform; }
+.search-trigger:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -14px rgba(0, 0, 0, .7); }
+.search-trigger:focus-visible { box-shadow: var(--focus-ring); }
+
+/* Pill online: chấm có sóng lan */
+.net-pill:not(.offline) .net-dot { animation: pulse-ring 2s var(--ease-in-out) infinite; color: var(--success); }
+
+/* Cụm hành động bên phải */
+.topbar-actions { display: flex; align-items: center; gap: var(--space-2); }
+
+/* Số dư / ví (trang seller): <div class="balance-pill">{icon} <b>1.250.000₫</b></div> */
+.balance-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px 5px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--gold-0, #fbbf24) 40%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gold-0, #fbbf24) 16%, transparent), transparent 70%), var(--bg-2);
+  color: var(--text-0);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease-spring), box-shadow var(--motion-fast);
+}
+.balance-pill > svg, .balance-pill .balance-ico {
+  display: grid; place-items: center;
+  width: 24px; height: 24px; padding: 4px;
+  border-radius: 50%;
+  background: var(--gold-gradient, linear-gradient(135deg, #fde68a, #f59e0b));
+  color: #3a2300;
+}
+.balance-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -12px rgba(245, 158, 11, .6); }
+
+/* Chấm thông báo trên icon-btn: <button class="icon-btn has-dot"> */
+.icon-btn.has-dot { position: relative; }
+.icon-btn.has-dot::after {
+  content: "";
+  position: absolute; top: 6px; right: 6px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-0);
+  box-shadow: 0 0 0 2px var(--bg-1), 0 0 10px var(--accent-ring);
+}
+
+/* ============================ CONTENT ============================ */
+#content { scroll-padding-top: var(--space-6); scrollbar-gutter: stable; }
+#content > .view { animation-timing-function: var(--ease-soft); }
+
+/* Tiêu đề trang: <header class="page-head"><div>…h1+p…</div><div class="actions">…</div></header> */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-0);
+  position: relative;
+}
+.page-head::after {                      /* đoạn accent dưới đường kẻ */
+  content: "";
+  position: absolute; left: 0; bottom: -1px;
+  width: 72px; height: 2px;
+  border-radius: 2px;
   background: var(--accent-gradient);
-  color: #180b08;
-  box-shadow: var(--accent-glow);
-  animation: float-pulse 2.4s var(--ease-in-out) infinite;
+  box-shadow: 0 0 12px var(--accent-ring);
 }
-#splash .splash-name {
-  font-size: var(--fs-2xl);
-  font-weight: var(--weight-bold);
-  letter-spacing: .4px;
-}
-#splash .splash-tag { color: var(--text-2); font-size: var(--fs-md); }
+.page-head h1 { font-size: var(--fs-2xl); letter-spacing: -.02em; }
+.page-head p { margin-top: 4px; color: var(--text-2); font-size: var(--fs-md); }
+.page-head .actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 
-/* ---- Responsive ---- */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-6) 0 var(--space-3); }
+.section-head h2 { font-size: var(--fs-lg); }
+.section-head .link { font-size: var(--fs-sm); color: var(--accent-1); cursor: pointer; }
+
+/* Grid helpers */
+.grid-2    { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.grid-3    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.grid-4    { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+.split     { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.split > aside { position: sticky; top: 0; }
+
+/* ============================ STATUSBAR ============================ */
+#statusbar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .03), transparent),
+    var(--glass-strong);
+  backdrop-filter: blur(var(--blur-glass)) saturate(1.4);
+}
+#statusbar::before {
+  content: "";
+  position: absolute; left: 0; right: 0; top: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-ring), transparent);
+  opacity: .55;
+  pointer-events: none;
+}
+#statusbar .dot:not(.offline) { animation: pulse-ring 2.2s var(--ease-in-out) infinite; border-radius: 50%; }
+#statusbar .sb-brand { background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: var(--weight-bold); }
+
+/* ============================ SPLASH ============================ */
+#splash {
+  background:
+    radial-gradient(720px 440px at 50% 28%, color-mix(in srgb, var(--accent-0) 22%, transparent), transparent 65%),
+    radial-gradient(560px 360px at 90% 100%, rgba(160, 107, 255, .16), transparent 70%),
+    radial-gradient(520px 320px at 0% 100%, rgba(94, 160, 255, .12), transparent 70%),
+    var(--bg-0);
+}
+#splash .splash-mark { position: relative; box-shadow: var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, .45); }
+#splash .splash-mark::after {            /* vòng sóng toả quanh logo */
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--accent-0);
+  animation: ping 2s var(--ease-out) infinite;
+}
+#splash.boot-stuck .splash-mark::after { animation: none; opacity: 0; }
+#splash .splash-name { background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+/* Thanh tải mảnh dưới splash: <div class="splash-bar"><i></i></div> */
+#splash .splash-bar { width: 160px; height: 3px; overflow: hidden; border-radius: 3px; background: var(--bg-3); }
+#splash .splash-bar > i { display: block; width: 40%; height: 100%; border-radius: inherit; background: var(--accent-gradient); animation: indeterminate 1.2s var(--ease-in-out) infinite; }
+
+/* ============================ RESPONSIVE ============================ */
 @media (max-width: 1279px) {
-  #content { padding: var(--space-5) var(--space-6) var(--space-8); }
-  .search-trigger { min-width: 168px; }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split  { grid-template-columns: minmax(0, 1fr); }
+  .split > aside { position: static; }
+}
+@media (max-width: 999px) {
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .balance-pill b { display: none; }
+  .page-head h1 { font-size: var(--fs-xl, 22px); }
+}
+@media (max-width: 700px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (max-width: 999px) {
-  .search-trigger .grow, .search-trigger kbd { display: none; }
-  .search-trigger { min-width: 0; }
-  .net-pill span:not(.net-dot) { display: none; }
-}
+/* Light theme: bớt chói */
+[data-theme="light"] #sidebar { background: radial-gradient(260px 180px at 0% 0%, color-mix(in srgb, var(--accent-0) 8%, transparent), transparent 70%), var(--bg-1); }
+[data-theme="light"] .nav-item.active .nav-icon { box-shadow: 0 4px 10px -6px var(--accent-ring), inset 0 1px 0 rgba(255, 255, 255, .5); }

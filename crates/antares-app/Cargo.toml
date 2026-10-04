@@ -8,7 +8,25 @@ description = "F-14/M3 — native service composition root cho Tauri command sur
 [dependencies]
 antares-process = { path = "../antares-process" }
 antares-storage = { path = "../antares-storage" }
+# Batch 07a — play_preflight scan JRE hệ thống (parity sidecar java check).
+antares-java = { path = "../antares-java" }
+# Batch 07b — play_launch: version JSON → lệnh + resolve java (composition
+# root được phép biết core task supervisor + domain crates, §target arch).
+antares-core = { path = "../antares-core" }
+antares-launch = { path = "../antares-launch" }
+antares-mods = { path = "../antares-mods" }
+# Batch 07c — install pipeline: tải version/libraries/assets (download engine)
+# + Mojang manifest/fabric meta/forge maven (HTTP thuần antares-downloads).
+antares-downloads = { path = "../antares-downloads" }
+antares-net = { path = "../antares-net" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 log.workspace = true
+lzma-rs = "0.3.0"
+
+# Batch 07a — disk free native (parity shutil.disk_usage §14: KHÔNG reintroduce
+# Python/psutil). Unix qua libc::statvfs; Windows tự khai extern kernel32 (1 API
+# — không kéo windows-sys chỉ vì GetDiskFreeSpaceExW).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

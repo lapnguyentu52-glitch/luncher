@@ -9,3 +9,10 @@ antares-java = { path = "../antares-java" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+log.workspace = true
+# B07b — os.version rule trong version JSON (parity re.match của MLL).
+regex = "1"
+
+# B07b — parity get_os_version: uname release (Linux/macOS).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

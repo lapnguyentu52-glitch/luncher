@@ -1,5 +1,7 @@
 /* ============================================================
-   Base — reset, typography, scrollbars, focus, utilities
+   Base PREMIUM — reset, typography, nền aurora, scrollbar, focus, utilities
+   Giữ nguyên toàn bộ biến/class cũ. Thêm: nền nhiều tầng sâu hơn,
+   typography tinh chỉnh, glass, gradient-text, line-clamp, divider...
    ============================================================ */
 
 *,
@@ -10,71 +12,77 @@
   padding: 0;
 }
 
-html,
-body {
+html {
   height: 100%;
+  color-scheme: dark light;
+  -webkit-text-size-adjust: 100%;
 }
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"]  { color-scheme: dark; }
 
 body {
+  height: 100%;
   background: var(--bg-0);
   color: var(--text-0);
   font-family: var(--font-sans);
   font-size: var(--fs-base);
   font-weight: var(--weight-normal);
   line-height: 1.5;
+  font-feature-settings: "cv11", "ss01", "calt";   /* chữ gọn, đẹp hơn ở font hỗ trợ */
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow: hidden;
   user-select: none;
   cursor: default;
 }
 
-/* Lớp nền nhiều lớp: aurora + vignette (không gây reflow).
-   UX-1: blob trôi RẤT chậm bằng transform (compositor-only, không repaint —
-   docs/UIUX-UPGRADE.md §2.2); reduced-motion -> đứng im. */
+/* ---------- Nền nhiều tầng: aurora + vignette ----------
+   Chỉ animate transform (compositor-only). Đổi tên keyframes thành bg-drift
+   để KHÔNG đụng @keyframes aurora-drift trong animations.css. */
 body::before {
   content: "";
   position: fixed;
-  inset: -12%;              /* dư biên cho transform trôi không lộ mép */
+  inset: -14%;
   z-index: 0;
   pointer-events: none;
   will-change: transform;
   background:
-    radial-gradient(900px 520px at 12% -8%, rgba(255, 92, 71, .15), transparent 62%),
-    radial-gradient(760px 480px at 100% 0%, rgba(94, 160, 255, .11), transparent 60%),
-    radial-gradient(700px 700px at 50% 120%, rgba(160, 107, 255, .09), transparent 62%);
-  animation: aurora-drift 90s var(--ease-in-out) infinite alternate;
+    radial-gradient(920px 540px at 10% -10%, rgba(255, 92, 71, .17), transparent 62%),
+    radial-gradient(780px 500px at 102% 2%,  rgba(94, 160, 255, .13), transparent 60%),
+    radial-gradient(720px 720px at 50% 122%, rgba(160, 107, 255, .11), transparent 62%),
+    radial-gradient(520px 360px at 88% 62%,  rgba(52, 211, 153, .06), transparent 65%);
+  animation: bg-drift 90s var(--ease-in-out) infinite alternate;
 }
 
-@keyframes aurora-drift {
+@keyframes bg-drift {
   from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(-2.5%, 2%, 0) scale(1.06); }
+  50%  { transform: translate3d(-2%, 1.5%, 0) scale(1.05); }
+  to   { transform: translate3d(2.5%, -2%, 0) scale(1.08); }
 }
 
-@media (prefers-reduced-motion: reduce), [data-motion="reduced"] {
+/* Sửa lỗi cũ: attribute selector không hợp lệ trong media query → tách riêng */
+@media (prefers-reduced-motion: reduce) {
   body::before { animation: none; }
 }
+[data-motion="reduced"] body::before { animation: none; }
 
-/* Lớp hạt nhiễu (grain) rất mờ — thêm chiều sâu "chất liệu" cho nền,
-   1 lớp tĩnh duy nhất nên không tốn hiệu năng (spec: chỉ animate opacity/transform,
-   lớp này không animate). */
+/* Vignette + grain: chiều sâu "chất liệu", lớp tĩnh duy nhất nên không tốn hiệu năng */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: .028;
+  opacity: .03;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-[data-theme="light"] body::after { opacity: .018; }
-
-/* Aurora nhạt hơn 50% ở light theme (UX-1) */
+[data-theme="light"] body::after  { opacity: .02; }
 [data-theme="light"] body::before { opacity: .55; }
 
-/* Người dùng tắt transparency (OS) -> glass đặc, không blur (UX-1 fallback) */
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass: var(--bg-1);
@@ -86,22 +94,33 @@ body::after {
   body::before, body::after { display: none; }
 }
 
+/* ---------- Typography ---------- */
 h1, h2, h3, h4 {
   font-weight: var(--weight-bold);
-  line-height: 1.25;
-  letter-spacing: -.01em;
+  line-height: 1.22;
+  letter-spacing: -.018em;
+  text-wrap: balance;                 /* tiêu đề xuống dòng cân đối */
 }
+p { text-wrap: pretty; }              /* tránh dòng cuối chỉ 1 chữ */
 
 a {
   color: var(--accent-0);
   text-decoration: none;
+  text-underline-offset: 3px;
+  transition: color var(--motion-fast, .15s) var(--ease-out, ease-out);
 }
-
-a:hover { text-decoration: underline; }
+a:hover { text-decoration: underline; text-decoration-thickness: 1.5px; }
 
 code, kbd, pre {
   font-family: var(--font-mono);
   font-size: .92em;
+}
+
+code:not(pre code) {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-3);
+  border: 1px solid var(--border-1);
 }
 
 kbd {
@@ -110,61 +129,61 @@ kbd {
   border: 1px solid var(--border-1);
   border-bottom-width: 2px;
   border-radius: var(--radius-xs);
-  background: var(--bg-3);
+  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
   color: var(--text-1);
   font-size: 10px;
   line-height: 1.6;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset;
 }
 
-/* ---- Selection ---- */
+/* ---------- Selection ---------- */
 ::selection {
   background: var(--accent-soft);
   color: var(--text-0);
 }
 
-/* ---- Scrollbars ---- */
+/* ---------- Scrollbars ---------- */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--bg-4) transparent;
 }
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--bg-4);
   border: 2px solid transparent;
   border-radius: var(--radius-pill);
   background-clip: content-box;
+  transition: background-color .2s;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-2);
+  background: var(--accent-0);
   background-clip: content-box;
 }
-
 ::-webkit-scrollbar-corner { background: transparent; }
 
-/* ---- Focus (keyboard only, spec 326 accessibility) ---- */
+/* ---------- Focus (chỉ bàn phím) ---------- */
 :focus { outline: none; }
-
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
 }
 
-/* ---- Trạng thái mặc định cho ảnh/icon ---- */
+/* Cho phép bôi đen/copy ở nơi cần */
+input, textarea, [contenteditable], .selectable, pre, code {
+  user-select: text;
+  cursor: auto;
+}
+button, [role="button"], summary, label[for] { cursor: pointer; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+
+/* ---------- Ảnh / icon ---------- */
 img, svg { display: block; }
+img { max-width: 100%; -webkit-user-drag: none; }
 svg { flex: 0 0 auto; }
 
-/* ---- Utilities ---- */
+/* ---------- Utilities (giữ nguyên) ---------- */
 .grow { flex: 1 1 auto; min-width: 0; }
 .muted { color: var(--text-2); font-size: var(--fs-sm); }
 .dim { color: var(--text-3); }
@@ -194,7 +213,66 @@ svg { flex: 0 0 auto; }
   border: 0;
 }
 
-/* Skeleton loading (thay spinner chặn — spec 68) */
+/* ---------- Utilities MỚI ---------- */
+/* Số liệu thẳng hàng — giá tiền, thống kê, bảng */
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum", "zero" 0; }
+
+/* Chữ gradient — tiêu đề hero, giá nổi bật */
+.gradient-text {
+  background: linear-gradient(120deg, var(--accent-0), #a06bff 55%, #5ea0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Kính mờ — thanh trên cùng, popover, thẻ nổi */
+.glass {
+  background: var(--glass, color-mix(in srgb, var(--bg-1) 72%, transparent));
+  -webkit-backdrop-filter: blur(var(--blur-glass, 18px)) saturate(160%);
+  backdrop-filter: blur(var(--blur-glass, 18px)) saturate(160%);
+  border: 1px solid var(--border-1);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* Cắt chữ nhiều dòng */
+.clamp-2, .clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-2 { -webkit-line-clamp: 2; line-clamp: 2; }
+.clamp-3 { -webkit-line-clamp: 3; line-clamp: 3; }
+
+/* Đường kẻ mờ dần hai đầu — sang hơn border đặc */
+.divider {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--border-2, var(--border-1)), transparent);
+}
+
+/* Viền gradient mảnh quanh card nổi bật (không cần wrapper) */
+.gradient-border {
+  position: relative;
+  border-radius: var(--radius-lg, 16px);
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--accent-0), rgba(160, 107, 255, .7), rgba(94, 160, 255, .6));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Vòng sáng ngoài cho phần tử đang active / được chọn */
+.ring-accent { box-shadow: 0 0 0 1.5px var(--accent-0), 0 0 22px -4px var(--accent-ring, var(--accent-soft)); }
+
+/* ---------- Skeleton (đồng bộ với animations.css) ---------- */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -208,5 +286,5 @@ svg { flex: 0 0 auto; }
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, var(--bg-hover), transparent);
-  animation: shimmer 1.4s infinite;
+  animation: shimmer 1.5s var(--ease-in-out, ease-in-out) infinite;
 }

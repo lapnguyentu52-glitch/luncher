@@ -24,12 +24,24 @@ pub fn required_java_major(mc_version: &str) -> u16 {
     if version.starts_with('a') || version.starts_with('b') {
         return 8;
     }
-    let parts: Vec<u32> = version
-        .split('.')
-        .map(|p| p.trim().parse().unwrap_or(0))
-        .collect();
-    let minor = parts.get(1).copied().unwrap_or(0);
-    let patch = parts.get(2).copied().unwrap_or(0);
+    let mut segments = version.split('.');
+    // Snapshot "24w14a" (đầu không phải số) hoặc số đầu > 1 → bản mới nhất
+    // → 21 (parity JavaManager.required_major_for — bản cũ parse fail thành 0
+    // → nhầm Java 8 cho snapshot).
+    let Ok(first) = segments.next().unwrap_or_default().trim().parse::<u32>() else {
+        return 21;
+    };
+    if first > 1 {
+        return 21;
+    }
+    let minor = segments
+        .next()
+        .and_then(|p| p.trim().parse::<u32>().ok())
+        .unwrap_or(0);
+    let patch = segments
+        .next()
+        .and_then(|p| p.trim().parse::<u32>().ok())
+        .unwrap_or(0);
     match minor {
         m if m <= 16 => 8,
         17 => 16,
@@ -152,6 +164,9 @@ mod tests {
         assert_eq!(required_java_major("1.20.6"), 21);
         assert_eq!(required_java_major("1.21.4"), 21);
         assert_eq!(required_java_major("1.22"), 21);
+        // B07b fix — snapshot đầu không phải số → 21 (trước đây parse fail → 0 → 8)
+        assert_eq!(required_java_major("24w14a"), 21);
+        assert_eq!(required_java_major("1.21.2-snapshot"), 21);
     }
 
     fn slots_system(major: u16) -> JavaSlots {

@@ -55,10 +55,13 @@ export const ErrorCodes = {
   NetworkUnavailable: 'NETWORK_UNAVAILABLE',
   IpcSessionStale: 'IPC_SESSION_STALE',
   InstanceLocked: 'INSTANCE_LOCKED',
+  InstanceNotFound: 'INSTANCE_NOT_FOUND',
   JavaNotFound: 'JAVA_NOT_FOUND',
   McVersionUnknown: 'MC_VERSION_UNKNOWN',
   LegacyDisabled: 'LEGACY_DISABLED',
   InstanceNameInvalid: 'INSTANCE_NAME_INVALID',
+  MinecraftVersionNotFound: 'MINECRAFT_VERSION_NOT_FOUND',
+  LoaderInstallFailed: 'LOADER_INSTALL_FAILED',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]

@@ -1,0 +1,51 @@
+{
+  "id": "1.21.11",
+  "type": "release",
+  "mainClass": "net.minecraft.client.main.Main",
+  "assets": "17",
+  "arguments": {
+    "game": [
+      "--username", "${auth_player_name}",
+      "--version", "${version_name}",
+      "--gameDir", "${game_directory}",
+      "--assetsDir", "${assets_root}",
+      {"rules": [{"action": "allow", "os": {"name": "osx"}}], "value": ["--screenshotDirname", "osx-only"]},
+      {"rules": [{"action": "allow", "features": {"is_demo_user": true}}], "value": "--demo"},
+      {"rules": [{"action": "allow", "features": {"has_custom_resolution": true}}], "value": ["--width", "${resolution_width}"]},
+      {"rules": [{"action": "disallow", "os": {"name": "windows"}}], "value": "--no-windows-flag"}
+    ],
+    "jvm": [
+      {"rules": [{"action": "allow", "os": {"name": "windows"}}], "value": "-XstartOnFirstThread"},
+      {"rules": [{"action": "allow", "os": {"name": "osx"}}], "value": "-XstartOnFirstThread"},
+      "-Djava.library.path=${natives_directory}",
+      "-DignoreList=bootstraplauncher,securejarhandler",
+      "-cp", "${classpath}"
+    ]
+  },
+  "libraries": [
+    {
+      "name": "com.mojang:brigadier:1.3.13",
+      "downloads": { "artifact": { "path": "com/mojang/brigadier/1.3.13/brigadier-1.3.13.jar" } }
+    },
+    {
+      "name": "org.lwjgl:lwjgl:3.3.3",
+      "natives": { "linux": "natives-linux", "windows": "natives-windows", "osx": "natives-macos" },
+      "downloads": {
+        "classifiers": {
+          "natives-linux": { "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar" },
+          "natives-windows": { "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar" },
+          "natives-macos": { "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar" }
+        }
+      },
+      "extract": { "exclude": ["META-INF/"] }
+    },
+    {
+      "name": "ca.weblite:java-objc-bridge:1.1",
+      "rules": [{ "action": "allow", "os": { "name": "osx" } }]
+    },
+    {
+      "name": "net.java.dev.jna:jna:5.17.0",
+      "rules": [{ "action": "allow", "os": { "name": "windows" } }]
+    }
+  ]
+}

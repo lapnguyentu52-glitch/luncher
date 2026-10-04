@@ -16,6 +16,9 @@ tauri-build = { version = "2", features = [] }
 antares-core = { path = "../crates/antares-core" }
 antares-bridge = { path = "../crates/antares-bridge" }
 antares-app = { path = "../crates/antares-app" }
+# Batch 06 — java_list/versions_list map request → crate (§88.2).
+antares-java = { path = "../crates/antares-java" }
+antares-net = { path = "../crates/antares-net" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde.workspace = true

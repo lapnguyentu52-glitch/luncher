@@ -1,115 +1,293 @@
 /* ============================================================
-   Animations — chỉ animate opacity/transform (spec mục 26)
+   Animations PREMIUM — chỉ animate opacity/transform (spec mục 26)
+   Giữ nguyên toàn bộ class/keyframes cũ, thêm bộ hiệu ứng "seller":
+   shine, spring, badge pop, aurora, sparkle, ping, shake, ticker...
    ============================================================ */
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+:root {
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);   /* nảy nhẹ, cảm giác "xịn" */
+  --ease-back:   cubic-bezier(.68, -.4, .32, 1.4);
+  --ease-soft:   cubic-bezier(.22, 1, .36, 1);       /* êm, giảm tốc mượt */
 }
+
+/* ---------- Keyframes cơ bản (giữ nguyên + tinh chỉnh) ---------- */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 @keyframes view-enter {
-  from { opacity: 0; transform: translateY(10px) scale(.995); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(12px) scale(.992); }
+  to   { opacity: 1; transform: none; }
 }
-
 @keyframes view-leave {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; }
+  to   { opacity: 0; transform: translateY(-4px); }
 }
-
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(10px) scale(.96); }
-  to { opacity: 1; transform: none; }
+  0%   { opacity: 0; transform: translateY(14px) scale(.94); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
 }
-
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(14px) scale(.97); }
-  to { opacity: 1; transform: none; }
+  0%   { opacity: 0; transform: translateY(18px) scale(.95); }
+  65%  { opacity: 1; transform: translateY(-2px) scale(1.005); }
+  100% { opacity: 1; transform: none; }
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(100%); }
-}
-
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @keyframes float-pulse {
   0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
-  50% { transform: translateY(-4px) scale(1.03); opacity: .9; }
+  50%      { transform: translateY(-4px) scale(1.03); opacity: .9; }
 }
-
 @keyframes indeterminate {
-  0% { transform: translateX(-110%); }
+  0%   { transform: translateX(-110%); }
   100% { transform: translateX(320%); }
 }
-
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-ring); }
-  50% { box-shadow: 0 0 0 6px transparent; }
+  50%      { box-shadow: 0 0 0 6px transparent; }
 }
-
-/* Chấm trạng thái "đang chạy" — toả nhẹ rồi tắt, lặp chậm, không gây phân tâm */
 @keyframes pulse-ring {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); }
-  50% { box-shadow: 0 0 0 4px transparent; }
+  50%      { box-shadow: 0 0 0 4px transparent; }
 }
-
 @keyframes fade-slide-up {
   from { opacity: 0; transform: translateY(9px); }
-  to { opacity: 1; transform: none; }
+  to   { opacity: 1; transform: none; }
 }
 
-/* ---- Stagger: các item trong grid/list xuất hiện lần lượt (thêm class .stagger
-   vào container — thuần CSS, không cần JS tính delay). Giới hạn 14 item đầu để
-   danh sách dài không bị "chờ" quá lâu; item sau item 14 hiện ngay. ---- */
+/* ---------- Keyframes MỚI ---------- */
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in-left  { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in-down  { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+@keyframes zoom-in        { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
+
+/* Pop kiểu "nảy" cho badge / số đếm / giỏ hàng */
+@keyframes pop {
+  0%   { transform: scale(.4); opacity: 0; }
+  55%  { transform: scale(1.18); opacity: 1; }
+  80%  { transform: scale(.94); }
+  100% { transform: scale(1); }
+}
+/* Số nhảy khi giá trị đổi (thêm class .tick rồi gỡ sau 400ms) */
+@keyframes tick {
+  0%   { transform: translateY(0); opacity: 1; }
+  40%  { transform: translateY(-35%); opacity: 0; }
+  41%  { transform: translateY(35%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+/* Vòng sóng lan ra — dùng cho chấm "online", thông báo mới */
+@keyframes ping {
+  0%   { transform: scale(1); opacity: .65; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+/* Lắc nhẹ báo lỗi / chú ý */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+/* Chuông rung khi có thông báo */
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+}
+/* Tim đập */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.22); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.14); }
+  70% { transform: scale(1); }
+}
+/* Lơ lửng chậm cho icon / hero */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+/* Ánh sáng quét ngang (dùng với ::after) */
+@keyframes sheen {
+  from { transform: translateX(-130%) skewX(-20deg); }
+  to   { transform: translateX(230%) skewX(-20deg); }
+}
+/* Lấp lánh */
+@keyframes twinkle {
+  0%, 100% { transform: scale(.6) rotate(0); opacity: .25; }
+  50%      { transform: scale(1.1) rotate(45deg); opacity: 1; }
+}
+/* Blob nền aurora trôi chậm */
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  33%  { transform: translate3d(6%, -5%, 0) scale(1.08); }
+  66%  { transform: translate3d(-5%, 6%, 0) scale(.96); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+/* Thanh tiến trình đầy */
+@keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* Dấu tick vẽ ra khi thành công */
+@keyframes check-pop {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Stagger: item xuất hiện lần lượt (tối đa 14 item đầu) ---------- */
 .stagger > * {
-  animation: fade-slide-up var(--motion-slow) var(--ease-out) both;
+  animation: fade-slide-up var(--motion-slow) var(--ease-soft) both;
 }
 .stagger > *:nth-child(n+15) { animation-delay: 0ms !important; }
-.stagger > *:nth-child(1) { animation-delay: 0ms; }
-.stagger > *:nth-child(2) { animation-delay: 35ms; }
-.stagger > *:nth-child(3) { animation-delay: 70ms; }
-.stagger > *:nth-child(4) { animation-delay: 105ms; }
-.stagger > *:nth-child(5) { animation-delay: 140ms; }
-.stagger > *:nth-child(6) { animation-delay: 175ms; }
-.stagger > *:nth-child(7) { animation-delay: 210ms; }
-.stagger > *:nth-child(8) { animation-delay: 245ms; }
-.stagger > *:nth-child(9) { animation-delay: 280ms; }
-.stagger > *:nth-child(10) { animation-delay: 315ms; }
-.stagger > *:nth-child(11) { animation-delay: 350ms; }
-.stagger > *:nth-child(12) { animation-delay: 385ms; }
-.stagger > *:nth-child(13) { animation-delay: 420ms; }
-.stagger > *:nth-child(14) { animation-delay: 455ms; }
+.stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger > *:nth-child(10) { animation-delay: 360ms; }
+.stagger > *:nth-child(11) { animation-delay: 400ms; }
+.stagger > *:nth-child(12) { animation-delay: 440ms; }
+.stagger > *:nth-child(13) { animation-delay: 480ms; }
+.stagger > *:nth-child(14) { animation-delay: 520ms; }
 
-/* UIX v3: hàng trong virtual list mount mới -> fade-slide-up nhanh, không chậm tay */
-[data-anim="row"] {
-  animation: fade-slide-up var(--motion-fast) var(--ease-out) both;
+/* Biến thể stagger: nảy zoom cho lưới sản phẩm */
+.stagger.stagger-pop > * { animation-name: zoom-in; animation-timing-function: var(--ease-spring); }
+
+[data-anim="row"] { animation: fade-slide-up var(--motion-fast) var(--ease-out) both; }
+
+/* ---------- Tiện ích gọi nhanh ---------- */
+.anim-fade   { animation: fade-in var(--motion-slow) var(--ease-out) both; }
+.anim-up     { animation: fade-slide-up var(--motion-slow) var(--ease-soft) both; }
+.anim-pop    { animation: pop .5s var(--ease-out) both; }
+.anim-zoom   { animation: zoom-in var(--motion-slow) var(--ease-spring) both; }
+.anim-left   { animation: slide-in-left var(--motion-slow) var(--ease-soft) both; }
+.anim-right  { animation: slide-in-right var(--motion-slow) var(--ease-soft) both; }
+.anim-float  { animation: float-y 5s var(--ease-in-out) infinite; }
+.anim-shake  { animation: shake .45s var(--ease-out); }
+.anim-bell   { transform-origin: 50% 0; animation: bell-ring 1s var(--ease-in-out); }
+.anim-heart  { animation: heartbeat 1.4s var(--ease-in-out) infinite; }
+.anim-spin   { animation: spin 1s linear infinite; }
+.anim-check  { animation: check-pop .5s var(--ease-spring) both; }
+.tick        { animation: tick .4s var(--ease-out); }
+
+/* Chấm online có sóng lan (đặt trong phần tử position:relative) */
+.ping { position: relative; }
+.ping::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: ping 1.8s var(--ease-out) infinite;
+  z-index: -1;
 }
 
-/* UIX v3: card micro-interaction — lift khi hover, ép nhẹ khi nhấn */
+/* ---------- Card micro-interaction nâng cấp ---------- */
 @media (hover: hover) {
   .card.hoverable,
   .inst-card,
   .skin-card {
-    transition: transform var(--motion-fast) var(--ease-out),
+    transition: transform var(--motion-fast) var(--ease-soft),
       box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast);
     will-change: transform;
   }
   .card.hoverable:hover,
   .inst-card:hover,
-  .skin-card:hover {
-    transform: translateY(-3px);
-  }
+  .skin-card:hover { transform: translateY(-4px) scale(1.008); }
   .inst-card:active,
-  .skin-card:active {
-    transform: translateY(-1px) scale(.985);
+  .skin-card:active { transform: translateY(-1px) scale(.985); }
+
+  /* Quét ánh sáng qua card khi hover — kiểu thẻ sản phẩm cao cấp */
+  .shine { position: relative; overflow: hidden; isolation: isolate; }
+  .shine::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.22), transparent);
+    transform: translateX(-130%) skewX(-20deg);
+    pointer-events: none;
+    z-index: 1;
   }
+  .shine:hover::after { animation: sheen .85s var(--ease-soft); }
+
+  /* Nút bấm: nổi lên + ép xuống có độ nảy */
+  .btn-lift { transition: transform var(--motion-fast) var(--ease-spring); }
+  .btn-lift:hover  { transform: translateY(-2px); }
+  .btn-lift:active { transform: translateY(0) scale(.96); }
+
+  /* Icon trong nút xoay/nhích nhẹ khi hover */
+  .btn-lift:hover .ico-nudge { transform: translateX(3px); }
+  .ico-nudge { transition: transform var(--motion-fast) var(--ease-spring); }
+  .ico-rotate:hover { transform: rotate(90deg); }
+  .ico-rotate { transition: transform var(--motion-base, .3s) var(--ease-spring); }
 }
 
-/* UIX v3: skeleton loading — sweep shimmer thuần CSS cho các khối chờ data */
+/* Nút CTA có ánh sáng chạy liên tục (dùng cho "Mua ngay", "Nâng cấp") */
+.cta-sheen { position: relative; overflow: hidden; isolation: isolate; }
+.cta-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent);
+  transform: translateX(-130%) skewX(-20deg);
+  animation: sheen 3.2s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+
+/* Viền phát sáng thở nhẹ — dùng cho gói nổi bật / "Best seller" */
+.glow-border { animation: glow-pulse 2.4s var(--ease-in-out) infinite; }
+
+/* Badge xuất hiện có độ nảy (giỏ hàng, thông báo, HOT, -30%) */
+.badge-pop { animation: pop .55s var(--ease-out) both; }
+
+/* Sparkle: đặt 2-3 phần tử .sparkle quanh icon/tiêu đề, lệch animation-delay */
+.sparkle {
+  position: absolute;
+  width: 10px; height: 10px;
+  background: currentColor;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: twinkle 2.2s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+.sparkle:nth-of-type(2) { animation-delay: .7s; }
+.sparkle:nth-of-type(3) { animation-delay: 1.4s; }
+
+/* Nền aurora: 2-3 blob mờ trôi chậm sau hero/header. Chỉ transform → nhẹ GPU */
+.aurora { position: relative; overflow: hidden; isolation: isolate; }
+.aurora > .blob {
+  position: absolute;
+  width: 46%; aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: .35;
+  z-index: -1;
+  animation: aurora-drift 18s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+.aurora > .blob:nth-child(2) { animation-duration: 24s; animation-delay: -6s; }
+.aurora > .blob:nth-child(3) { animation-duration: 30s; animation-delay: -12s; }
+
+/* Thanh tiến trình có vệt sáng chạy */
+.progress-shine { position: relative; overflow: hidden; transform-origin: left center; animation: bar-grow .8s var(--ease-soft) both; }
+.progress-shine::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+  animation: shimmer 1.8s var(--ease-in-out) infinite;
+}
+
+/* Overlay / backdrop */
+.backdrop-enter { animation: backdrop-in var(--motion-base, .25s) var(--ease-out) both; }
+
+/* ---------- Skeleton: sweep mượt hơn ---------- */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -122,18 +300,21 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, var(--bg-hover), transparent);
-  animation: shimmer 1.4s var(--ease-in-out) infinite;
+  animation: shimmer 1.5s var(--ease-in-out) infinite;
 }
-.skeleton.title { height: 22px; width: 42%; }
-.skeleton.line { height: 12px; width: 78%; }
-.skeleton.card { min-height: 96px; border-radius: var(--radius-md); }
+.skeleton.title  { height: 22px; width: 42%; }
+.skeleton.line   { height: 12px; width: 78%; }
+.skeleton.card   { min-height: 96px; border-radius: var(--radius-md); }
+.skeleton.avatar { width: 40px; height: 40px; border-radius: 50%; }
+.skeleton.thumb  { aspect-ratio: 16 / 10; border-radius: var(--radius-md); }
 
-/* Người dùng chọn "Reduced motion" trong Settings (spec 154) */
+/* ---------- Reduced motion ---------- */
 [data-motion="reduced"] *,
 [data-motion="reduced"] *::before,
 [data-motion="reduced"] *::after {
   animation-duration: .001ms !important;
   animation-iteration-count: 1 !important;
+  animation-delay: 0ms !important;
   transition-duration: .001ms !important;
 }
 
@@ -141,6 +322,7 @@
   *, *::before, *::after {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: .001ms !important;
   }
 }

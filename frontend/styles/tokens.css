@@ -1,41 +1,52 @@
 /* ============================================================
-   Tokens — Antares Launcher design system (spec mục 25, 154, 326-329)
-   Bố cục: tokens.css -> base.css -> layout.css -> components.css
-            -> views.css -> animations.css
+   Tokens PREMIUM — Antares Launcher design system
+   Thứ tự nạp: tokens → base → components → components.premium
+               → layout → layout.premium → views → animations
+   Giữ NGUYÊN toàn bộ tên biến cũ. Chỉ chỉnh giá trị cho sâu/sang hơn
+   và bổ sung token mà các lớp premium đang dùng (gold, hot/sale/new/vip,
+   bg-raise, ease-soft, accent-on...).
    ============================================================ */
 
 :root {
   color-scheme: dark;
 
-  /* ---- Surfaces (nền) ---- */
-  --bg-0: #06070b;
-  --bg-1: #0b0d13;
-  --bg-2: #11141c;
-  --bg-3: #171b25;
-  --bg-4: #1e2330;
-  --bg-hover: rgba(255, 255, 255, .045);
-  --bg-active: rgba(255, 255, 255, .075);
+  /* ---- Surfaces: ngả xanh-tím rất nhẹ, tách tầng rõ hơn ---- */
+  --bg-0: #05060a;
+  --bg-1: #0a0c12;
+  --bg-2: #10131b;
+  --bg-3: #161a24;
+  --bg-4: #1d2230;
+  --bg-5: #262c3d;                       /* MỚI: bề mặt nổi nhất (popover, tooltip) */
+  --bg-hover: rgba(255, 255, 255, .05);
+  --bg-active: rgba(255, 255, 255, .08);
+
+  /* Alias mà components.css đang gọi (trước đây chưa định nghĩa) */
+  --bg-raise: var(--bg-2);
+  --bg-elev:  var(--bg-3);
+  --bg-card:  var(--bg-2);
+  --bg-soft:  var(--bg-1);
 
   /* Kính mờ / overlay */
-  --glass: rgba(17, 20, 28, .72);
-  --glass-strong: rgba(9, 11, 16, .82);
-  --scrim: rgba(4, 5, 8, .66);
+  --glass: rgba(16, 19, 27, .70);
+  --glass-strong: rgba(8, 10, 15, .84);
+  --scrim: rgba(3, 4, 7, .68);
 
   /* ---- Text ---- */
-  --text-0: #f6f7fb;
-  --text-1: #c3c9d6;
-  --text-2: #858d9d;
-  --text-3: #5b6272;
+  --text-0: #f7f8fc;
+  --text-1: #c7cddb;
+  --text-2: #8a92a3;
+  --text-3: #5f6677;
 
   /* ---- Accent (đỏ Antares) ---- */
   --accent-0: #ff5c47;
   --accent-1: #ff8a70;
   --accent-2: #ffd08a;
   --accent-deep: #c8351f;
+  --accent-on: #180b08;                  /* MỚI: màu chữ/icon đặt trên nền accent */
   --accent-soft: rgba(255, 92, 71, .14);
-  --accent-ring: rgba(255, 92, 71, .38);
-  --accent-glow: 0 0 0 1px rgba(255, 92, 71, .28), 0 12px 32px -12px rgba(255, 92, 71, .55);
-  --accent-gradient: linear-gradient(135deg, #ff7a5c 0%, #ff5c47 45%, #e0361d 100%);
+  --accent-ring: rgba(255, 92, 71, .40);
+  --accent-glow: 0 0 0 1px rgba(255, 92, 71, .30), 0 12px 32px -12px rgba(255, 92, 71, .6);
+  --accent-gradient: linear-gradient(135deg, #ff8566 0%, #ff5c47 42%, #e8381f 78%, #cc3620 100%);
 
   /* ---- Semantic ---- */
   --success: #2ad07f;
@@ -46,11 +57,24 @@
   --danger-soft: rgba(242, 85, 95, .14);
   --info: #5ea0ff;
   --info-soft: rgba(94, 160, 255, .14);
+  --danger-border: color-mix(in srgb, var(--danger) 45%, transparent);
+  --warn-border:   color-mix(in srgb, var(--warning) 45%, transparent);
+  --warn: var(--warning);
+  --ok: var(--success);
+
+  /* ---- Bộ màu "seller" (badge, ribbon, giá, VIP) ---- */
+  --gold-0: #fbbf24;
+  --gold-1: #f59e0b;
+  --hot-gradient:  linear-gradient(135deg, #ff8a4c, #ff3d71);
+  --sale-gradient: linear-gradient(135deg, #34d399, #059669);
+  --new-gradient:  linear-gradient(135deg, #38bdf8, #2563eb);
+  --vip-gradient:  linear-gradient(135deg, #a78bfa, #7c3aed);
+  --gold-gradient: linear-gradient(135deg, #fde68a, #f59e0b);
 
   /* ---- Borders / rings ---- */
-  --border-0: rgba(255, 255, 255, .055);
-  --border-1: rgba(255, 255, 255, .095);
-  --border-2: rgba(255, 255, 255, .16);
+  --border-0: rgba(255, 255, 255, .06);
+  --border-1: rgba(255, 255, 255, .10);
+  --border-2: rgba(255, 255, 255, .17);
   --focus-ring: 0 0 0 3px var(--accent-ring);
 
   /* ---- Radius ---- */
@@ -59,6 +83,7 @@
   --radius-md: 13px;
   --radius-lg: 18px;
   --radius-xl: 24px;
+  --radius-2xl: 32px;                    /* MỚI */
   --radius-pill: 999px;
 
   /* ---- Spacing scale ---- */
@@ -70,13 +95,16 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
+  --space-12: 48px;                      /* MỚI */
+  --space-16: 64px;                      /* MỚI */
 
   /* ---- Typography (font-scale nhân mọi cỡ — Settings → Appearance, UX-5) ---- */
   --font-scale: 1;
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
-    "Inter", Roboto, sans-serif;
+  --font-sans: "Inter Variable", "Inter", "Segoe UI Variable Text", "Segoe UI",
+    system-ui, -apple-system, Roboto, sans-serif;
   --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "SFMono-Regular",
     ui-monospace, monospace;
+  --mono: var(--font-mono);
   --fs-xs: calc(11px * var(--font-scale));
   --fs-sm: calc(12px * var(--font-scale));
   --fs-md: calc(13px * var(--font-scale));
@@ -85,32 +113,37 @@
   --fs-xl: calc(20px * var(--font-scale));
   --fs-2xl: calc(26px * var(--font-scale));
   --fs-3xl: calc(34px * var(--font-scale));
+  --fs-4xl: calc(44px * var(--font-scale));   /* MỚI: số liệu hero */
   --weight-normal: 450;
   --weight-medium: 550;
   --weight-bold: 700;
 
-  /* ---- Glass blur budget (UX-1: chuẩn hoá, ≤14px — docs/UIUX-UPGRADE.md §2.2) ---- */
-  --blur-scrim: 4px;    /* overlay mờ nhẹ sau modal */
-  --blur-glass: 12px;   /* topbar/palette/modal mặc định */
-  --blur-strong: 14px;  /* surface nổi nhất (command palette) */
+  /* ---- Glass blur budget (UX-1: chuẩn hoá, ≤14px) ---- */
+  --blur-scrim: 4px;
+  --blur-glass: 12px;
+  --blur-strong: 14px;
 
   /* ---- Density (UX-5: comfortable=1 / compact=.8) ---- */
   --density: 1;
 
-  /* ---- Elevation ---- */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
-  --shadow-2: 0 8px 24px -12px rgba(0, 0, 0, .7);
-  --shadow-3: 0 24px 60px -24px rgba(0, 0, 0, .85);
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .04);
+  /* ---- Elevation: 4 tầng + inset + viền sáng cạnh trên ---- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-2: 0 10px 26px -12px rgba(0, 0, 0, .75);
+  --shadow-3: 0 26px 64px -24px rgba(0, 0, 0, .9);
+  --shadow-4: 0 40px 90px -30px rgba(0, 0, 0, .95);   /* MỚI: modal lớn, hero */
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .05);
 
   /* ---- Motion ---- */
   --motion-instant: 90ms;
   --motion-fast: 140ms;
   --motion-normal: 220ms;
+  --motion-base: 220ms;                  /* alias: các lớp premium gọi tên này */
   --motion-slow: 380ms;
   --ease-out: cubic-bezier(.22, .68, .36, 1);
   --ease-in-out: cubic-bezier(.55, .06, .32, 1);
-  --ease-spring: cubic-bezier(.34, 1.42, .48, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);   /* nảy rõ hơn bản cũ (1.42) */
+  --ease-soft: cubic-bezier(.22, 1, .36, 1);        /* MỚI: giảm tốc rất êm */
+  --ease-back: cubic-bezier(.68, -.4, .32, 1.4);    /* MỚI */
 
   /* ---- Layout metrics ---- */
   --sidebar-w: 244px;
@@ -130,16 +163,30 @@
   --z-splash: 1200;
 }
 
+/* ============================================================
+   Token phái sinh từ accent — tính lại trên MỌI phần tử mang data-accent,
+   nên đổi màu accent ở html hay body đều ăn đúng.
+   ============================================================ */
+:root,
+[data-accent] {
+  --accent-soft-2: color-mix(in srgb, var(--accent-0) 22%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent-0) 55%, transparent);
+  --accent-glow-lg: 0 0 0 1px color-mix(in srgb, var(--accent-0) 30%, transparent),
+    0 22px 56px -16px color-mix(in srgb, var(--accent-0) 65%, transparent);
+  --accent-text: var(--accent-1);        /* màu chữ accent trên nền thường (light theme sẽ đậm hơn) */
+}
+
 /* ---- Accent variants (Settings → Appearance) ---- */
 [data-accent="gold"] {
   --accent-0: #f5c842;
   --accent-1: #ffd977;
   --accent-2: #fff0c2;
   --accent-deep: #b98d0d;
+  --accent-on: #2a1d00;
   --accent-soft: rgba(245, 200, 66, .14);
-  --accent-ring: rgba(245, 200, 66, .38);
-  --accent-glow: 0 0 0 1px rgba(245, 200, 66, .28), 0 12px 32px -12px rgba(245, 200, 66, .5);
-  --accent-gradient: linear-gradient(135deg, #ffd977 0%, #f5c842 45%, #d69f14 100%);
+  --accent-ring: rgba(245, 200, 66, .40);
+  --accent-glow: 0 0 0 1px rgba(245, 200, 66, .30), 0 12px 32px -12px rgba(245, 200, 66, .55);
+  --accent-gradient: linear-gradient(135deg, #ffe08a 0%, #f5c842 42%, #e0aa1a 78%, #d69f14 100%);
 }
 
 [data-accent="blue"] {
@@ -147,10 +194,11 @@
   --accent-1: #7cb0ff;
   --accent-2: #cfe1ff;
   --accent-deep: #2a5fd0;
+  --accent-on: #04122e;
   --accent-soft: rgba(77, 141, 255, .14);
-  --accent-ring: rgba(77, 141, 255, .38);
-  --accent-glow: 0 0 0 1px rgba(77, 141, 255, .28), 0 12px 32px -12px rgba(77, 141, 255, .5);
-  --accent-gradient: linear-gradient(135deg, #7cb0ff 0%, #4d8dff 45%, #2a5fd0 100%);
+  --accent-ring: rgba(77, 141, 255, .40);
+  --accent-glow: 0 0 0 1px rgba(77, 141, 255, .30), 0 12px 32px -12px rgba(77, 141, 255, .55);
+  --accent-gradient: linear-gradient(135deg, #86b6ff 0%, #4d8dff 42%, #346fe6 78%, #2a5fd0 100%);
 }
 
 [data-accent="violet"] {
@@ -158,10 +206,11 @@
   --accent-1: #c19bff;
   --accent-2: #e6d8ff;
   --accent-deep: #6d34d6;
+  --accent-on: #140636;
   --accent-soft: rgba(160, 107, 255, .14);
-  --accent-ring: rgba(160, 107, 255, .38);
-  --accent-glow: 0 0 0 1px rgba(160, 107, 255, .28), 0 12px 32px -12px rgba(160, 107, 255, .5);
-  --accent-gradient: linear-gradient(135deg, #c19bff 0%, #a06bff 45%, #6d34d6 100%);
+  --accent-ring: rgba(160, 107, 255, .40);
+  --accent-glow: 0 0 0 1px rgba(160, 107, 255, .30), 0 12px 32px -12px rgba(160, 107, 255, .55);
+  --accent-gradient: linear-gradient(135deg, #c8a3ff 0%, #a06bff 42%, #8247f0 78%, #6d34d6 100%);
 }
 
 [data-accent="teal"] {
@@ -169,10 +218,11 @@
   --accent-1: #5fdcd0;
   --accent-2: #c2f4ee;
   --accent-deep: #0d8c80;
+  --accent-on: #022420;
   --accent-soft: rgba(31, 194, 180, .14);
-  --accent-ring: rgba(31, 194, 180, .38);
-  --accent-glow: 0 0 0 1px rgba(31, 194, 180, .28), 0 12px 32px -12px rgba(31, 194, 180, .5);
-  --accent-gradient: linear-gradient(135deg, #5fdcd0 0%, #1fc2b4 45%, #0d8c80 100%);
+  --accent-ring: rgba(31, 194, 180, .40);
+  --accent-glow: 0 0 0 1px rgba(31, 194, 180, .30), 0 12px 32px -12px rgba(31, 194, 180, .55);
+  --accent-gradient: linear-gradient(135deg, #6ce6da 0%, #1fc2b4 42%, #12a597 78%, #0d8c80 100%);
 }
 
 [data-accent="magenta"] {
@@ -180,10 +230,37 @@
   --accent-1: #e58ce5;
   --accent-2: #f8d7f8;
   --accent-deep: #9c1f9e;
+  --accent-on: #2c042d;
   --accent-soft: rgba(213, 79, 214, .14);
-  --accent-ring: rgba(213, 79, 214, .38);
-  --accent-glow: 0 0 0 1px rgba(213, 79, 214, .28), 0 12px 32px -12px rgba(213, 79, 214, .5);
-  --accent-gradient: linear-gradient(135deg, #e58ce5 0%, #d54fd6 45%, #9c1f9e 100%);
+  --accent-ring: rgba(213, 79, 214, .40);
+  --accent-glow: 0 0 0 1px rgba(213, 79, 214, .30), 0 12px 32px -12px rgba(213, 79, 214, .55);
+  --accent-gradient: linear-gradient(135deg, #ee9aee 0%, #d54fd6 42%, #b835ba 78%, #9c1f9e 100%);
+}
+
+/* MỚI: cam — hợp trang bán hàng */
+[data-accent="orange"] {
+  --accent-0: #ff8a2b;
+  --accent-1: #ffaa5e;
+  --accent-2: #ffd9b0;
+  --accent-deep: #cc5a0a;
+  --accent-on: #2a1100;
+  --accent-soft: rgba(255, 138, 43, .14);
+  --accent-ring: rgba(255, 138, 43, .40);
+  --accent-glow: 0 0 0 1px rgba(255, 138, 43, .30), 0 12px 32px -12px rgba(255, 138, 43, .6);
+  --accent-gradient: linear-gradient(135deg, #ffb066 0%, #ff8a2b 42%, #f06d0f 78%, #cc5a0a 100%);
+}
+
+/* MỚI: xanh lá — tiền / tăng trưởng */
+[data-accent="emerald"] {
+  --accent-0: #22c97a;
+  --accent-1: #5fe0a2;
+  --accent-2: #c4f5dc;
+  --accent-deep: #0f8f52;
+  --accent-on: #02210f;
+  --accent-soft: rgba(34, 201, 122, .14);
+  --accent-ring: rgba(34, 201, 122, .40);
+  --accent-glow: 0 0 0 1px rgba(34, 201, 122, .30), 0 12px 32px -12px rgba(34, 201, 122, .55);
+  --accent-gradient: linear-gradient(135deg, #6ce8aa 0%, #22c97a 42%, #14ab64 78%, #0f8f52 100%);
 }
 
 /* ---- Density (UX-5): compact ép padding card + gap section ---- */
@@ -193,37 +270,48 @@
   --space-6: 18px;
 }
 
-/* ---- Light theme (Settings → Appearance: Dark / Light) ---- */
+/* ---- Light theme: trắng ấm, bóng đổ ngả xanh, màu chữ accent/semantic đậm hơn để đủ tương phản ---- */
 [data-theme="light"] {
   color-scheme: light;
-  --bg-0: #eef0f4;
-  --bg-1: #f7f8fb;
+  --bg-0: #eceef4;
+  --bg-1: #f6f7fb;
   --bg-2: #ffffff;
-  --bg-3: #f1f3f8;
-  --bg-4: #e6e9f0;
+  --bg-3: #f0f2f8;
+  --bg-4: #e4e8f0;
+  --bg-5: #d9dee9;
   --bg-hover: rgba(10, 14, 25, .045);
-  --bg-active: rgba(10, 14, 25, .075);
+  --bg-active: rgba(10, 14, 25, .08);
   --glass: rgba(255, 255, 255, .74);
-  --glass-strong: rgba(255, 255, 255, .88);
-  --scrim: rgba(30, 36, 48, .38);
-  --text-0: #12151f;
-  --text-1: #3b4252;
-  --text-2: #6b7385;
-  --text-3: #9aa1b1;
+  --glass-strong: rgba(255, 255, 255, .90);
+  --scrim: rgba(28, 34, 48, .40);
+  --text-0: #11141e;
+  --text-1: #384050;
+  --text-2: #667086;
+  --text-3: #98a0b1;
   --border-0: rgba(12, 18, 32, .08);
   --border-1: rgba(12, 18, 32, .14);
-  --border-2: rgba(12, 18, 32, .22);
-  --shadow-1: 0 1px 2px rgba(19, 26, 43, .09);
-  --shadow-2: 0 10px 26px -14px rgba(19, 26, 43, .3);
-  --shadow-3: 0 24px 60px -28px rgba(19, 26, 43, .4);
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .6);
+  --border-2: rgba(12, 18, 32, .23);
+  --shadow-1: 0 1px 2px rgba(19, 26, 43, .10);
+  --shadow-2: 0 12px 28px -14px rgba(19, 26, 43, .32);
+  --shadow-3: 0 26px 64px -28px rgba(19, 26, 43, .42);
+  --shadow-4: 0 40px 90px -34px rgba(19, 26, 43, .5);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, .7);
+
+  /* Chữ màu trên nền trắng cần đậm hơn bản dark */
+  --success: #11a35f;
+  --warning: #c7840a;
+  --danger: #d8343f;
+  --info: #2f78e6;
+  --accent-text: var(--accent-deep);
+  --accent-1: var(--accent-deep);        /* .badge.accent, .chip.active, .tab.active... đọc rõ trên nền sáng */
 }
 
-/* ---- Reduced motion (spec 154): tắt animation nặng ---- */
+/* ---- Reduced motion (spec 154) ---- */
 [data-motion="reduced"] {
   --motion-instant: 0ms;
   --motion-fast: 0ms;
   --motion-normal: 0ms;
+  --motion-base: 0ms;
   --motion-slow: 0ms;
 }
 
@@ -232,19 +320,20 @@
     --motion-instant: 0ms;
     --motion-fast: 0ms;
     --motion-normal: 0ms;
+    --motion-base: 0ms;
     --motion-slow: 0ms;
   }
 }
 
-/* UX-5: người dùng cần tương phản cao -> viền rõ hơn (WCAG) */
+/* ---- Tương phản cao (WCAG) ---- */
 @media (prefers-contrast: more) {
   :root {
-    --border-1: rgba(255, 255, 255, .18);
-    --border-2: rgba(255, 255, 255, .3);
-    --text-2: #9aa3b5;
+    --border-1: rgba(255, 255, 255, .20);
+    --border-2: rgba(255, 255, 255, .32);
+    --text-2: #a0a9bb;
   }
   [data-theme="light"] {
-    --border-1: rgba(12, 18, 32, .22);
-    --border-2: rgba(12, 18, 32, .36);
+    --border-1: rgba(12, 18, 32, .24);
+    --border-2: rgba(12, 18, 32, .38);
   }
 }

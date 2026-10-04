@@ -4,9 +4,12 @@ import { clearBrowserFallbacks, registerBrowserFallback } from '@/services/ipc'
 import {
   createInstance,
   getDashboardSummary,
+  listAccounts,
   listInstances,
   listJavas,
+  listVersions,
   runPreflight,
+  selectAccount,
   selectInstance,
 } from '@/services/flowsCommands'
 import type { AntaresInstance, PreflightResult } from '@/types/instances'
@@ -41,26 +44,6 @@ describe('flows commands (M6 smoke)', () => {
     registerBrowserFallback('legacy_call', (_cmd, args) => {
       const a = args as { method: string; params?: Record<string, unknown> }
       switch (a.method) {
-        case 'java.list':
-          return { ok: true, data: { javas: [{ path: '/j', exe: '/j/java', major: 21, name: 'jdk21' }] }, warnings: [] }
-        case 'play.preflight':
-          return { ok: true, data: { ...demoPreflight, instanceId: String(a.params?.instanceId) }, warnings: [] }
-        case 'play.launch':
-          return { ok: true, data: { taskId: 'task-99' }, warnings: [] }
-        case 'dashboard.summary':
-          return {
-            ok: true,
-            data: {
-              appVersion: '4.0.0',
-              instanceCount: 1,
-              selectedInstanceId: 'abc123',
-              recentInstanceId: 'abc123',
-              recentInstanceName: 'Demo',
-              account: { id: 'a1', displayName: 'Steve' },
-              legacyAvailable: true,
-            },
-            warnings: [],
-          }
         default:
           return { ok: false, error: { code: 'METHOD_NOT_FOUND', message: a.method }, warnings: [] }
       }
@@ -79,6 +62,60 @@ describe('flows commands (M6 smoke)', () => {
       const a = args as { name: string }
       return { ok: true, data: { instance: { ...demoInstance, name: a.name } }, warnings: [] }
     })
+    // Batch 06 — accounts/java/versions/dashboard native (không qua legacy_call).
+    registerBrowserFallback('accounts_list', () => ({
+      ok: true,
+      data: { accounts: [{ id: 'a1', displayName: 'Steve', type: 'offline' }] },
+      warnings: [],
+    }))
+    registerBrowserFallback('accounts_select', (_cmd, args) => {
+      const a = args as { accountId: string }
+      return { ok: true, data: { selected: a.accountId }, warnings: [] }
+    })
+    registerBrowserFallback('java_list', () => ({
+      ok: true,
+      data: { javas: [{ path: '/j', exe: '/j/java', major: 21, name: 'jdk21' }] },
+      warnings: [],
+    }))
+    registerBrowserFallback('versions_list', () => ({
+      ok: true,
+      data: { versions: [{ id: '1.21.11', type: 'release' }] },
+      warnings: [],
+    }))
+    registerBrowserFallback('dashboard_summary', () => ({
+      ok: true,
+      data: {
+        appVersion: '4.0.0',
+        instanceCount: 1,
+        selectedInstanceId: 'abc123',
+        recentInstanceId: 'abc123',
+        recentInstanceName: 'Demo',
+        account: { id: 'a1', displayName: 'Steve' },
+        legacyAvailable: true,
+      },
+      warnings: [],
+    }))
+    // Batch 07a — play preflight native (không qua legacy_call).
+    registerBrowserFallback('play_preflight', (_cmd, args) => {
+      const a = args as { instanceId: string }
+      return {
+        ok: true,
+        data: { ...demoPreflight, instanceId: a.instanceId },
+        warnings: [],
+      }
+    })
+    // Batch 07b — play launch native (contract {taskId} như sidecar).
+    registerBrowserFallback('play_launch', () => ({
+      ok: true,
+      data: { taskId: 'task-99' },
+      warnings: [],
+    }))
+    // Batch 07c — play install native (contract {taskId}, task INSTALL chạy nền).
+    registerBrowserFallback('play_install', () => ({
+      ok: true,
+      data: { taskId: 'task-77' },
+      warnings: [],
+    }))
   })
   afterEach(() => {
     clearBrowserFallbacks()
@@ -105,6 +142,22 @@ describe('flows commands (M6 smoke)', () => {
     expect(javas[0]?.major).toBe(21)
   })
 
+  it('listAccounts trả accounts đã strip secret (Batch 06 native)', async () => {
+    const accounts = await listAccounts()
+    expect(accounts).toHaveLength(1)
+    expect(accounts[0]?.displayName).toBe('Steve')
+  })
+
+  it('selectAccount echo account id (Batch 06 native)', async () => {
+    const selected = await selectAccount('a1')
+    expect(selected).toBe('a1')
+  })
+
+  it('listVersions map id từ object (Batch 06 native)', async () => {
+    const versions = await listVersions()
+    expect(versions).toEqual(['1.21.11'])
+  })
+
   it('runPreflight trả canPlay + checks', async () => {
     const result = await runPreflight('abc123')
     expect(result.canPlay).toBe(true)
@@ -115,6 +168,15 @@ describe('flows commands (M6 smoke)', () => {
     const { launchInstance } = await import('@/services/flowsCommands')
     const task = await launchInstance('abc123')
     expect(task.id).toBe('task-99')
+    expect(task.owner).toBe('instance:abc123')
+    expect(task.state).toBe('running')
+  })
+
+  it('installInstance map taskId → LegacyTaskPayload type INSTALL (07c)', async () => {
+    const { installInstance } = await import('@/services/flowsCommands')
+    const task = await installInstance('abc123')
+    expect(task.id).toBe('task-77')
+    expect(task.type).toBe('INSTALL')
     expect(task.owner).toBe('instance:abc123')
     expect(task.state).toBe('running')
   })

@@ -23,11 +23,24 @@ pub mod codes {
     pub const LEGACY_DISABLED: &str = "LEGACY_DISABLED";
     /// Batch 05 — tên instance không hợp lệ (parity codes.INSTANCE_NAME_INVALID).
     pub const INSTANCE_NAME_INVALID: &str = "INSTANCE_NAME_INVALID";
+    /// Batch 06 — tài khoản Microsoft không tồn tại/không chọn được (parity AUTH_FAILED).
+    pub const AUTH_FAILED: &str = "AUTH_FAILED";
+    /// Batch 07a — instance không tồn tại, chặn trước khi chạm service
+    /// (parity sidecar `INSTANCE_NOT_FOUND` — preflight/launch/repair…).
+    pub const INSTANCE_NOT_FOUND: &str = "INSTANCE_NOT_FOUND";
+    /// Batch 06 — tham số không hợp lệ, ví dụ loader lạ (parity VALIDATION_FAILED).
+    pub const VALIDATION_FAILED: &str = "VALIDATION_FAILED";
     /// §113 — process record (Rust-side catalog, Batch 07 wiring).
     pub const PROCESS_NOT_FOUND: &str = "PROCESS_NOT_FOUND";
     pub const PROCESS_STILL_RUNNING: &str = "PROCESS_STILL_RUNNING";
     pub const PROCESS_EXECUTABLE_NOT_FOUND: &str = "PROCESS_EXECUTABLE_NOT_FOUND";
     pub const PROCESS_SPAWN_FAILED: &str = "PROCESS_SPAWN_FAILED";
+    /// Batch 07c — version không có trong Mojang manifest (parity
+    /// `codes.MINECRAFT_VERSION_NOT_FOUND` — MLL VersionNotFound).
+    pub const MINECRAFT_VERSION_NOT_FOUND: &str = "MINECRAFT_VERSION_NOT_FOUND";
+    /// Batch 07c — cài loader fabric/forge thất bại (parity
+    /// `codes.LOADER_INSTALL_FAILED` — legacy retry ×3).
+    pub const LOADER_INSTALL_FAILED: &str = "LOADER_INSTALL_FAILED";
 
     /// Mọi code đang có — test mirror TS + dùng cho fallback UI.
     pub const ALL: &[&str] = &[
@@ -43,10 +56,15 @@ pub mod codes {
         MC_VERSION_UNKNOWN,
         LEGACY_DISABLED,
         INSTANCE_NAME_INVALID,
+        AUTH_FAILED,
+        INSTANCE_NOT_FOUND,
+        VALIDATION_FAILED,
         PROCESS_NOT_FOUND,
         PROCESS_STILL_RUNNING,
         PROCESS_EXECUTABLE_NOT_FOUND,
         PROCESS_SPAWN_FAILED,
+        MINECRAFT_VERSION_NOT_FOUND,
+        LOADER_INSTALL_FAILED,
     ];
 
     /// Chính sách retry theo code (§117 `retryable`).
@@ -61,6 +79,8 @@ pub mod codes {
                 | INSTANCE_LOCKED
                 | STORAGE_WRITE_FAILED
                 | PROCESS_SPAWN_FAILED
+                // parity legacy ForgeProvider: install fail → retry ×3.
+                | LOADER_INSTALL_FAILED
         )
     }
 }
@@ -98,6 +118,15 @@ impl AppError {
 
     pub fn not_ready(message: impl Into<String>) -> Self {
         Self::new(codes::APP_NOT_READY, message)
+    }
+}
+
+/// B07b — core task supervisor error (TaskRegistry) → typed §117.
+/// code() đã là catalog string; retryable theo catalog (task codes → false —
+/// khớp policy core_state command layer đang hardcode false).
+impl From<antares_core::CoreError> for AppError {
+    fn from(err: antares_core::CoreError) -> Self {
+        Self::new(err.code(), err.to_string())
     }
 }
 

@@ -15,15 +15,26 @@
 //! kết luận khi evidence yếu) + `CompanionPairing` (ghi companion.json parity
 //! `RuntimeService.write_pairing_for_instance`).
 
+pub mod command;
 pub mod exit;
+pub mod jvm;
+pub mod mcjson;
 pub mod planner;
 pub mod preflight;
 pub mod resolver;
 pub mod session;
 
+pub use command::{
+    get_minecraft_command, patch_java, CommandOptions, LaunchHints, LAUNCHER_NAME, LAUNCHER_VERSION,
+};
 pub use exit::{
     CompanionEndpoint, CompanionPairing, Evidence, EvidenceSeverity, ExitAnalysis, ExitAnalyzer,
     ExitVerdict, PairingError,
+};
+pub use jvm::JvmConfig;
+pub use mcjson::{
+    classpath, inherit_json, natives_dir, natives_to_extract, parse_version_json,
+    resolve_version_json, Artifact, AssetIndex, Library, OsInfo, VersionJson, VersionJsonError,
 };
 pub use planner::{
     plan_launch, required_java_major, JavaSlots, PlanError, PlanInput, PlanOutput,

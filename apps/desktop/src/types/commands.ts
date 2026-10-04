@@ -103,6 +103,23 @@ export interface CommandSchema {
     response: { instance: AntaresInstance }
   }
   'instances_select': { request: { instanceId: string }; response: { selected: string } }
+  // Batch 06 — native accounts/java/versions/dashboard (B15.2 wiring, parity
+  // sidecar contracts: `{accounts}`, `{javas}`, `{versions}`, dashboard.summary)
+  'accounts_list': { request: void; response: { accounts: AccountSummary[] } }
+  'accounts_select': { request: { accountId: string }; response: { selected: string } }
+  'java_list': { request: void; response: { javas: JavaInfo[] } }
+  'versions_list': {
+    request: { loader?: string }
+    response: { versions: Array<string | { id: string }> }
+  }
+  'dashboard_summary': { request: void; response: DashboardSummary }
+  // Batch 07a/07b — play native (preflight parity 5 check; launch qua
+  // orchestrator antares-app: version JSON → classpath → spawn)
+  'play_preflight': { request: { instanceId: string }; response: PreflightResult }
+  'play_launch': { request: { instanceId: string }; response: { taskId: string } }
+  // Batch 07c — cài/repair instance không launch (native-only — legacy chỉ
+  // cài chung trong play.launch); task INSTALL chạy nền, poll như launch.
+  'play_install': { request: { instanceId: string }; response: { taskId: string } }
   'legacy_status': { request: void; response: LegacyStatusPayload }
   'legacy_start': { request: void; response: LegacyVersionInfo }
   'legacy_call': {

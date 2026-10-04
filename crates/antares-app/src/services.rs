@@ -6,8 +6,10 @@ use std::sync::Mutex;
 use antares_process::ProcessRegistry;
 use antares_storage::{ScopedRoot, StorageService};
 
+use crate::accounts::AccountStore;
 use crate::error::AppResult;
-use crate::instances::InstanceStore;
+use crate::instances::{Instance, InstanceStore};
+use crate::play::PreflightReport;
 use crate::runtime::RuntimeFlags;
 
 /// Managed service container (Batch 04). Command nhận `Arc<AppServices>` từ
@@ -17,6 +19,7 @@ pub struct AppServices {
     storage: StorageService,
     processes: Mutex<ProcessRegistry>,
     instances: InstanceStore,
+    accounts: AccountStore,
     flags: RuntimeFlags,
 }
 
@@ -33,10 +36,12 @@ impl AppServices {
             storage.scoped(ScopedRoot::Instances),
             storage.scoped(ScopedRoot::Config),
         );
+        let accounts = AccountStore::new(storage.scoped(ScopedRoot::Config));
         Self {
             storage,
             processes: Mutex::new(ProcessRegistry::default()),
             instances,
+            accounts,
             flags,
         }
     }
@@ -49,6 +54,40 @@ impl AppServices {
     /// Group instances (Batch 05) — parity sidecar `instances.*` handlers.
     pub fn instances(&self) -> &InstanceStore {
         &self.instances
+    }
+
+    /// Group accounts (Batch B15.2) — parity sidecar `accounts.*` handlers.
+    pub fn accounts(&self) -> &AccountStore {
+        &self.accounts
+    }
+
+    /// Group play (Batch 07a) — parity sidecar `play.preflight`:
+    /// scan JRE thật rồi chạy 5 check thuần (java/version/account/disk/mods).
+    pub fn play_preflight(&self, instance_id: &str) -> AppResult<PreflightReport> {
+        self.play_preflight_with_javas(instance_id, &antares_java::scan_java_infos())
+    }
+
+    /// Biến thể inject javas — test deterministic không phụ thuộc JRE trên
+    /// máy chạy test (parity sidecar test mock `scan_system_java`).
+    pub(crate) fn play_preflight_with_javas(
+        &self,
+        instance_id: &str,
+        javas: &[antares_java::JavaInfo],
+    ) -> AppResult<PreflightReport> {
+        let instance: Instance = self.instances.get(instance_id).ok_or_else(|| {
+            crate::error::AppError::new(
+                crate::error::codes::INSTANCE_NOT_FOUND,
+                format!("instance not found: {instance_id}"),
+            )
+        })?;
+        let account = self.accounts.selected_account();
+        let instances_dir = self.storage.root().join(ScopedRoot::Instances.dir_name());
+        Ok(crate::play::preflight(
+            &instance,
+            account.as_ref(),
+            javas,
+            &instances_dir,
+        ))
     }
 
     pub fn storage(&self) -> &StorageService {
@@ -189,6 +228,57 @@ mod tests {
 
         let normal = AppServices::with_flags(&root, RuntimeFlags::default());
         assert!(!normal.flags().rust_only);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // Batch 07a — play_preflight qua composition root.
+
+    #[test]
+    fn play_preflight_missing_instance_is_instance_not_found() {
+        let services = AppServices::new(temp_root("preflight-404"));
+        let err = services
+            .play_preflight_with_javas("ghost", &[])
+            .expect_err("instance không tồn tại → typed error");
+        assert_eq!(err.code, codes::INSTANCE_NOT_FOUND);
+        assert!(!err.retryable);
+        assert_eq!(err.message, "instance not found: ghost"); // parity sidecar
+    }
+
+    #[test]
+    fn play_preflight_full_flow_with_injected_javas() {
+        let root = temp_root("preflight-flow");
+        let services = AppServices::new(&root);
+        let instance = services
+            .instances()
+            .create("Demo", "1.21.11", Some("fabric"), None, None)
+            .expect("create");
+
+        // account = settings.json (cùng file sidecar ConfigManager)
+        std::fs::create_dir_all(root.join("config")).unwrap();
+        std::fs::write(
+            root.join("config/settings.json"),
+            r#"{"accounts":[{"id":"a1","displayName":"Steve","token":"secret"}],"selectedAccount":"a1"}"#,
+        )
+        .unwrap();
+
+        let javas = [antares_java::JavaInfo {
+            path: "/j".into(),
+            exe: "/j/bin/java".into(),
+            javaw: None,
+            major: 21,
+            name: "jdk21".into(),
+        }];
+        let report = services
+            .play_preflight_with_javas(&instance.id, &javas)
+            .expect("preflight");
+
+        assert_eq!(report.instance_id, instance.id);
+        assert!(report.can_play);
+        assert_eq!(report.blockers, 0);
+        let account = report.checks.iter().find(|c| c.id == "account").unwrap();
+        assert_eq!(account.detail, "Steve"); // secret strip: token không lộ
+        assert_eq!(report.checks[0].label, "Java ≥ 21");
+
         let _ = std::fs::remove_dir_all(&root);
     }
 }

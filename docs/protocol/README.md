@@ -40,7 +40,11 @@ Codes hiện có: `APP_INTERNAL`, `APP_NOT_READY`, `CONFIG_INVALID`, `STORAGE_WR
 `NETWORK_UNAVAILABLE`, `IPC_SESSION_STALE`, `INSTANCE_LOCKED`, `JAVA_NOT_FOUND`,
 `MC_VERSION_UNKNOWN`, `LEGACY_DISABLED` (M5 — `ANTA_RUST_ONLY=1` chặn lệnh legacy,
 UI nhận code này để chuyển flow native), `INSTANCE_NAME_INVALID` (Batch 05 —
-`instances.create` tên không hợp lệ).
+`instances.create` tên không hợp lệ), `AUTH_FAILED` + `VALIDATION_FAILED` (Batch 06 —
+`accounts.select` / `versions_list` loader lạ), `INSTANCE_NOT_FOUND` (Batch 07a —
+`play_preflight` instance không tồn tại, parity sidecar),
+`MINECRAFT_VERSION_NOT_FOUND` + `LOADER_INSTALL_FAILED` (Batch 07c — version
+không có trong Mojang manifest / cài loader fabric-forge thất bại, parity sidecar).
 Rust-side catalog thêm (chưa cần phía UI): `STORAGE_PATH_ESCAPED`, `PROCESS_NOT_FOUND`,
 `PROCESS_STILL_RUNNING`, `PROCESS_EXECUTABLE_NOT_FOUND`, `PROCESS_SPAWN_FAILED`.
 
