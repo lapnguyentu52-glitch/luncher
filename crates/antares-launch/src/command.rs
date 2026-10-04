@@ -351,15 +351,22 @@ mod tests {
         assert_eq!(cmd[2], "-Xmx2048M");
         // version jvm: linux KHÔNG có -XstartOnFirstThread (windows/osx mới có)
         assert!(!cmd.contains(&"-XstartOnFirstThread".to_string()));
+        // Path so sánh dựng bằng join (separator OS — parity MLL os.path.join:
+        // Windows dùng '\' nên không hardcode '/').
+        let natives = game_dir
+            .join("versions")
+            .join("1.21.11")
+            .join("natives");
         let lib_path = cmd.iter().find(|a| a.starts_with("-Djava.library.path="));
         assert_eq!(
-            lib_path.map(|s| s.trim_start_matches("-Djava.library.path=")),
-            Some("/game/inst/versions/1.21.11/natives")
+            lib_path.map(|s| s.trim_start_matches("-Djava.library.path=").to_string()),
+            Some(natives.to_string_lossy().into_owned())
         );
         // -cp + classpath ngay trước mainClass
         let cp_index = cmd.iter().position(|a| a == "-cp").expect("-cp");
         assert!(cmd[cp_index + 1].contains("brigadier-1.3.13.jar"));
-        assert!(cmd[cp_index + 1].ends_with("versions/1.21.11/1.21.11.jar"));
+        let jar_suffix = Path::new("versions").join("1.21.11").join("1.21.11.jar");
+        assert!(cmd[cp_index + 1].ends_with(jar_suffix.to_string_lossy().as_ref()));
         assert_eq!(cmd[cp_index + 2], "net.minecraft.client.main.Main");
 
         // game args: placeholder đã thay
@@ -368,7 +375,10 @@ mod tests {
         let game_dir_arg = cmd.iter().position(|a| a == "--gameDir").unwrap();
         assert_eq!(cmd[game_dir_arg + 1], "/game/inst");
         let assets = cmd.iter().position(|a| a == "--assetsDir").unwrap();
-        assert_eq!(cmd[assets + 1], "/game/inst/assets");
+        assert_eq!(
+            cmd[assets + 1],
+            game_dir.join("assets").to_string_lossy().into_owned()
+        );
         // demo/custom-resolution bị loại (feature live = false), osx-only loại trên linux
         assert!(!cmd.contains(&"--demo".to_string()));
         assert!(!cmd.contains(&"--screenshotDirname".to_string()));
