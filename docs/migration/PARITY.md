@@ -28,7 +28,7 @@ CRUD, ExitAnalyzer, CompanionPairing, Mojang manifest) — đánh dấu như bê
 
 ## Checklist parity theo domain (cập nhật khi bọc)
 
-Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, cần verify · ⏳ phase sau · ❌ chưa migrated.
+Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, cần verify · ⏳ phase 2 · ❌ chưa migrated.
 
 ### Downloads (legacy `services/downloads`)
 - [x] ✅ State machine DISCOVER→PREPARE→DOWNLOAD→VERIFY→COMMIT (§103) — `DownloadState`
@@ -51,6 +51,8 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 - [x] ✅ Atomic write tmp+rename (§99) — `write_json_atomic`
 - [x] ✅ ProfileStore CRUD state JSON qua storage (phase 4 — `profiles-state.json`,
   field name parity `lastRaw`)
+- [x] ✅ Migration `_write_options` (merge/dedupe key) sang `antares-profiles` + storage
+  (xong phase 2 — `write_options_merged`)
 
 ### Process (legacy `infrastructure/process/manager.py`)
 - [x] ✅ Record pid/owner/instance/fingerprint/exit (§113) — `ProcessRecord`
@@ -65,43 +67,9 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 - [x] ✅ Parse `java -version` (1.8 legacy mapping) — parity `discovery.py`
 - [x] ✅ Discovery scan known dirs theo OS + JAVA_HOME + PATH (resolve symlink, bỏ symlink
   subdir, dedupe giữ thứ tự) + `detect_major` timeout 15s + `java_info` (phase 3)
-- [ ] ⏳ Mojang runtime manifest download (manifest index đã có — `antares-net::manifest`)
-
-## Checklist parity theo domain (cập nhật khi bọc)
-
-Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, cần verify · ⏳ phase 2 · ❌ chưa migrated.
-
-### Downloads (legacy `services/downloads`)
-- [x] ✅ State machine DISCOVER→PREPARE→DOWNLOAD→VERIFY→COMMIT (§103) — `DownloadState`
-- [x] ✅ Codes lỗi: `CHECKSUM_MISMATCH`, `CONFIG_INVALID` — `ChecksumError::code()`
-- [x] ✅ Dedup: 2 instance cùng artifact → 1 download (§103) — `DedupRegistry`
-- [x] ✅ SHA-1/SHA-256 thuần + `verify_file` + `commit_artifact` atomic rename, idempotent (phase 2)
-- [x] ✅ HTTP engine (§102) thuần: GET + redirect 10 lần (Range không kế thừa qua redirect),
-  Content-Length + chunked, body cap 2GB (phase 3 — https/TLS nối khi bundle)
-- [x] ✅ Resume/range/partial file: `PartInfo` parity `.antares-part` + `.meta` (chặn resume
-  khác URL), pipeline Range `bytes=N-` + append, 200 thay 206 → restart từ đầu (phase 3)
-- [ ] ⏳ Streaming chunk (hiện buffer nguyên body — đủ cho artifact ≤ vài trăm MB)
-- [ ] ⏳ source fallback
-
-### Storage (legacy `infrastructure/fs` + `services/profiles` file I/O)
-- [x] ✅ Scoped roots + sandbox traversal (§98) — crate `antares-storage` (có sẵn từ trước)
-- [x] ✅ Atomic write tmp+rename (§99) — `write_json_atomic`
-- [ ] ☐ Migration `_write_options` (merge/dedupe key) sang `antares-profiles` + storage
-
-### Process (legacy `infrastructure/process/manager.py`)
-- [x] ✅ Record pid/owner/instance/fingerprint/exit (§113) — `ProcessRecord`
-- [x] ✅ Cleanup policy Wait/Kill/Keep, không kill ngoài scope (§113) — `CleanupPolicy` + `shutdown_plan`
-- [x] ✅ Spawn/wait/stop thật: stderr drain tagged, utf-8 lossy, stdin prompt graceful → wait timeout → kill, exit code → EXITED/Failed (phase 2; tests cross-platform — chạy cả Windows CI, gồm cwd space/unicode, `CREATE_NO_WINDOW`)
-- [x] ✅ stdout/stderr pipeline gộp dòng theo timestamp (§114) — `LogMux`: `timestamp_ms` + tag `stdout`/`stderr`, ring bounded drop-oldest (§88)
-- [x] ✅ Log storage (§115) — `LogMux::create_scoped(logs_root, scope)`: scope `[A-Za-z0-9._-]` chặn traversal (§50) → append `<logs_root>/<scope>.log` (caller truyền LogsRoot)
-
-### Java manager (legacy `services/java/discovery.py` + `manager.py`)
-- [x] ✅ Model `JavaRuntime` (§110) — source/path/major/minor/arch/vendor/verified/capabilities
-- [x] ✅ Resolve order: instance → profile → managed → mojang → system (§110)
-- [x] ✅ Parse `java -version` (1.8 legacy mapping) — parity `discovery.py`
-- [x] ✅ Discovery scan known dirs theo OS + JAVA_HOME + PATH (resolve symlink, bỏ symlink
-  subdir, dedupe giữ thứ tự) + `detect_major` timeout 15s + `java_info` (phase 3)
-- [ ] ⏳ Mojang runtime manifest download
+- [x] ✅ Mojang JRE runtime download (B07d) — `antares-app::mojang_runtime` parity MLL
+  `runtime.py`: manifest java-runtime + lzma → verify sha1 raw + `.version`/`.sha1` sidecar +
+  links/chmod; `resolve_java_for` 3 bước parity `_resolve_java`
 
 ### Minecraft launch (legacy `services/minecraft/launch/*`)
 - [x] ✅ Session state machine §112 (IDLE→…→COMPLETED/CRASHED + CANCELLED early exit)
@@ -116,6 +84,9 @@ Chú giải: ✅ parity verified (test song song Python) · ☐ Rust đã có, c
 - [x] ✅ ExitAnalyzer §116 (phase 4) — pipeline ingest→normalize→fingerprint→classify→
   rank evidence→recommendation; pattern OOM/mod-conflict/java-missing/user-cancel;
   weak evidence → Unknown + confidence 0 (§116 "không kết luận nếu evidence yếu")
+- [x] ✅ Profile launch hints (B07d) — `read_launch_hint`/`profile_launch_overrides` parity
+  `_profile_launch_overrides` → `LaunchHints` (`--server/--port`, `--width/--height`);
+  feature rules theo launch options parity `parse_single_rule` (library rules luôn `options={}`)
 - [ ] ⏳ ExitAnalyzer input đầy đủ: latest.log/crash-report file reading + runtime telemetry
 
 ### Network (legacy `services/diagnostics/net.py`)

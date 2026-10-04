@@ -153,30 +153,78 @@ mod tests {
         first.release(); // idempotent
     }
 
-    #[test]
-    fn stale_lock_is_stolen() {
-        let path = lock_path("stale");
-        let _ = std::fs::remove_file(&path);
-
-        // pid của process ĐÃ chết (spawn xong → wait xong).
+    /// Spawn process thật → pid của process đã chết. **Windows**: process
+    /// object (và pid) còn tồn tại tới khi mọi handle đóng — kể cả khi
+    /// `wait()` xong (conhost/Child giữ thêm vài ms) → spin chờ biến mất
+    /// hẳn. Trả `None` nếu sau timeout pid vẫn bị reclaim/đang sống → caller
+    /// thử pid khác.
+    fn spawn_dead_pid() -> Option<u32> {
         let mut child = std::process::Command::new(if cfg!(windows) {
             "cmd"
         } else {
             "true"
         })
-        .args(if cfg!(windows) { vec!["/C".to_string(), "exit 0".to_string()] } else { vec![] })
+        .args(if cfg!(windows) {
+            vec!["/C".to_string(), "exit 0".to_string()]
+        } else {
+            vec![]
+        })
         .spawn()
         .expect("spawn");
-        let dead_pid = child.id();
+        let pid = child.id();
         child.wait().expect("wait");
+        drop(child); // nhả handle → đóng process object (pid mới được frees)
+        for _ in 0..60 {
+            if !pid_alive(pid) {
+                return Some(pid);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        None
+    }
 
-        std::fs::write(
-            &path,
-            serde_json::json!({ "pid": dead_pid, "timestamp": 1.0 }).to_string(),
-        )
-        .unwrap();
-        let mut lock = ResourceLock::new(&path);
-        assert!(lock.acquire(), "pid chết → steal được");
+    #[test]
+    fn stale_lock_is_stolen() {
+        let path = lock_path("stale");
+        let _ = std::fs::remove_file(&path);
+
+        // pid của process ĐÃ chết (spawn → wait → drop handle). Windows tái
+        // sử dụng pid rất nhanh (test song song spawn java/cmd khác) → retry
+        // với pid chết mới; acquire fail khi pid bị reclaim giữa 2 dòng → retry.
+        let mut held: Option<ResourceLock> = None;
+        for _ in 0..5 {
+            let Some(dead_pid) = spawn_dead_pid() else {
+                continue;
+            };
+            std::fs::write(
+                &path,
+                serde_json::json!({ "pid": dead_pid, "timestamp": 1.0 }).to_string(),
+            )
+            .unwrap();
+            let mut lock = ResourceLock::new(&path);
+            if lock.acquire() {
+                held = Some(lock);
+                break;
+            }
+        }
+        let mut lock = match held {
+            Some(lock) => lock,
+            None => {
+                // Fallback tất định: pid ngoài dải OS — không bao giờ tồn tại
+                // (Windows max pid 0x3FFFFF → ERROR_INVALID_PARAMETER; Linux
+                // pid_max ≤ 2^22 → ESRCH). Không dùng u32::MAX: trên Unix nó
+                // cast thành pid_t -1 → kill(-1, 0) probe MỌI process → sống.
+                std::fs::write(
+                    &path,
+                    serde_json::json!({ "pid": 0x7FFF_FFFFu32, "timestamp": 1.0 })
+                        .to_string(),
+                )
+                .unwrap();
+                let mut lock = ResourceLock::new(&path);
+                assert!(lock.acquire(), "pid chết → steal được");
+                lock
+            }
+        };
         let payload: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(payload["pid"], std::process::id(), "đã ghi đè bằng pid mình");
